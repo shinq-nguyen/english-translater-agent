@@ -98,11 +98,17 @@ subagents → MCP calls).
 - the two worktrees under `.worktrees/` and their parallel commits
 - `tickets/<ID>/state.json`'s phase changing
 - `tickets/<ID>/bugs.md`, if the tester finds anything
+- `tickets/<ID>/audit.log` growing alongside `.codex/logs/audit.log` —
+  `ticket_audit.py` (one of the plugin's own two hooks, from P2) extends
+  Demo 3's `audit_log.py` pattern with the active ticket ID and phase, so
+  a session that gets interrupted (next step) still leaves a durable
+  trace of exactly where it was, independent of the transcript.
 
 **Why:** each of these is a different mechanism from Demos 1–3 showing up
 together in one real workflow — the Skill decides the steps, Subagents do
-the isolated BE/UI/test work, MCP is the Jira connection, and
-`state.json` is what makes the whole thing resumable (next step).
+the isolated BE/UI/test work, MCP is the Jira connection, `state.json` is
+what makes the whole thing resumable (next step), and the audit trail is
+Demo 3's Hooks mechanism reused for this workflow's own bookkeeping.
 
 ### R3 — show resumability live
 

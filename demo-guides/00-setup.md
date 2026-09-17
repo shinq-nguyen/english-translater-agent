@@ -5,10 +5,10 @@ install guide (see Step 0 if you genuinely don't have `codex` yet) — it's a
 hands-on build: starting from a plain `main` checkout, which has **none**
 of this repo's Codex configuration (verified — `main` has no `.codex/`, no
 `.agents/`, not even `AGENTS.md`), you'll write every file yourself: the
-MCP server config, a Skill, a Subagent role, two Hooks, and an exec-policy
-rules file. By the end you'll have the exact setup demos `02`–`04` walk
-through, and — because you typed it — you'll actually know what each line
-does instead of just turning something on.
+MCP server config, a Skill, a Subagent role, three Hooks, and an
+exec-policy rules file. By the end you'll have the exact setup demos
+`02`–`04` walk through, and — because you typed it — you'll actually know
+what each line does instead of just turning something on.
 
 If you'd rather skip the typing and just use a checkout that already has
 all of this (e.g. the `session2-codex-demo` branch), you don't need this
@@ -327,8 +327,9 @@ read. This step just confirms the file exists in the right place first.
 ## Step 6 — Write the Hooks
 
 Exec policy (Step 7) matches static command *shapes*; Hooks are the
-general backstop — they see the full command string and can deny before
-execution (`PreToolUse`) or just observe after (`PostToolUse`).
+general backstop — they see the full command/prompt text and can deny
+before it takes effect (`PreToolUse` for a tool call, `UserPromptSubmit`
+for a prompt) or just observe after the fact (`PostToolUse`).
 
 **Do this:**
 ```bash
@@ -818,7 +819,7 @@ already loaded.
 | **MCP** | `codex mcp list` | `translator_db`, `Status: enabled` |
 | **Skill** | inside `codex`, `/skills` | `add-ai-provider` listed |
 | **Subagent** | `test -f .codex/agents/secret-auditor.toml` | file exists (auto-discovered) |
-| **Hooks** | inside `codex`, `/hooks` | `block_secrets.py` + `audit_log.py` listed, approved |
+| **Hooks** | inside `codex`, `/hooks` | `block_secrets.py`, `audit_log.py`, `scan_prompt_secrets.py` all listed, approved |
 | **Exec policy** | `codex execpolicy check --pretty --rules .codex/rules/default.rules -- cat .env` | `forbidden` |
 
 **Why:** run this table top to bottom before the session starts — it's

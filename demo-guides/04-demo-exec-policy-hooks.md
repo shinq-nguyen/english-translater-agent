@@ -9,7 +9,8 @@ Real secret in play: root `.env` in this repo holds `APP_JWT_SECRET` and
 files for local dev) — this demo is about stopping those values from
 reaching a transcript from either direction: Codex reading and repeating
 them (Steps 0–2), or a human pasting one straight into chat (Step 3) —
-plus having a durable record of what Codex actually ran (Step 2).
+plus having a durable, redacted record of the whole prompt↔tool exchange,
+not just which commands ran (Step 2).
 
 **How to read each step:** a "Do this" block, an "Expected" block, and a
 short "Why." Run Steps 0 → 4 in order — each one only makes sense once the
