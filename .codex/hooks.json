@@ -11,6 +11,18 @@
             "statusMessage": "Checking command against .env-file policy"
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .codex/hooks/audit_log.py",
+            "timeout": 10,
+            "statusMessage": "Recording proposed tool call",
+            "async": true
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -21,7 +33,32 @@
             "type": "command",
             "command": "python .codex/hooks/audit_log.py",
             "timeout": 10,
-            "statusMessage": "Writing audit log entry",
+            "statusMessage": "Recording tool result",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .codex/hooks/scan_prompt_secrets.py",
+            "timeout": 10,
+            "statusMessage": "Scanning prompt for pasted tokens/keys"
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .codex/hooks/audit_log.py",
+            "timeout": 10,
+            "statusMessage": "Recording prompt",
             "async": true
           }
         ]

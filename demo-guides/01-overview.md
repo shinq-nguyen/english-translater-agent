@@ -9,8 +9,7 @@ the course outline, in order:
 | 6 | MCP — Extending Codex Capabilities | `02-demo-mcp.md` | Yes |
 | 7 | Skills vs Subagents | `03-demo-skills-vs-subagents.md` | Yes |
 | 8 | Execution Governance — Exec Policy & Hooks | `04-demo-exec-policy-hooks.md` | Yes |
-| 9 | Putting Everything Together | `05-demo-putting-together.md` | Design worksheet, not a scripted demo — same as the outline itself, which gives #9 no "Demo:" bullet |
-| bonus | A full Skill+Subagents+MCP+Hooks workflow | `06-demo-ticket-workflow.md` | Yes — needs its own Jira Cloud pre-work, see that file |
+| 9 | Putting Everything Together | `05-demo-ticket-workflow.md` | Yes — a full Skill+Subagents+MCP+Hooks ticket workflow; needs its own Jira Cloud pre-work, see that file |
 
 Every config file the demos reference already exists in this checkout —
 nobody needs to type TOML/JSON live. Presenter and attendees both just run
@@ -26,18 +25,28 @@ own time, not read together as a group. If you haven't, stop here and do
 that first; everything below assumes it's done.
 
 **60-second recap, if you did it a few days ago and want to reconfirm:**
+
+**Do this:**
 ```bash
 cd english-translater-agent
 docker compose ps          # translator-postgres should be running/healthy
 codex doctor                # auth: not "no credentials"; config.toml parse: ok; MCP servers: 1
 codex mcp list               # translator_db, Status: enabled
 ```
-If any of those look wrong, go back to `00-setup.md`'s self-check table
-rather than debugging from scratch here.
 
-## Bonus demo needs its own setup
+**Expected:**
+```
+docker compose ps   → translator-postgres   ...   running (healthy)
+codex doctor        → auth: <not "no credentials">, config.toml parse: ok, MCP servers: 1
+codex mcp list       → translator_db   Status: enabled
+```
 
-`06-demo-ticket-workflow.md` is not covered by `00-setup.md` — it needs a
+If any of those look wrong, go back to `00-setup.md`'s Step 9 self-check
+table rather than debugging from scratch here.
+
+## Demo 4 needs its own setup
+
+`05-demo-ticket-workflow.md` is not covered by `00-setup.md` — it needs a
 real Jira Cloud site, which can't be bundled the way the other demos'
 local Postgres is. Read that file's own pre-work section before presenting
 it; skip it entirely if a Jira site isn't available.
@@ -50,9 +59,11 @@ AGENTS.md                                — repo-level instructions
 .codex/rules/default.rules               — exec-policy rules (Demo 3)
 .codex/hooks.json                        — hook registration (Demo 3)
 .codex/hooks/block_secrets.py            — PreToolUse hook (Demo 3)
-.codex/hooks/audit_log.py                — PostToolUse hook (Demo 3)
+.codex/hooks/audit_log.py                — audit hook, all 3 events (Demo 3)
+.codex/hooks/scan_prompt_secrets.py      — UserPromptSubmit hook (Demo 3)
 .codex/agents/secret-auditor.toml        — subagent definition (Demo 2)
 .agents/skills/add-ai-provider/SKILL.md  — skill definition (Demo 2)
+plugins/ticket-workflow/                 — installable Skill+Subagents+MCP+Hooks plugin (Demo 4)
 demo-guides/                             — these guides
 ```
 
@@ -60,16 +71,18 @@ demo-guides/                             — these guides
 
 Project-level `.codex/config.toml` (MCP server, sandbox/approval settings)
 and non-managed hooks (`.codex/hooks.json`) only take effect once this repo
-is **trusted** in Codex (Session 1 §3, §8) — `00-setup.md` step 5 already
-did this once, but if anyone re-cloned the repo fresh for the session, or
-is on a different machine than they ran the pre-work on, they'll hit the
-trust prompt again the first time they open it. If a demo "doesn't work,"
-that's the first thing to check, before assuming the config itself is
-wrong.
+is **trusted** in Codex — `00-setup.md` Step 2 already did this once, but if
+anyone re-cloned the repo fresh for the session, or is on a different
+machine than they ran the pre-work on, they'll hit the trust prompt again
+the first time they open it.
+
+**Quick check:** if a demo "doesn't work," this is the first thing to
+check — before assuming the config itself is wrong.
 
 You're now ready for any of `02-demo-mcp.md`, `03-demo-skills-vs-subagents.md`,
-`04-demo-exec-policy-hooks.md`, `05-demo-putting-together.md` — each is
-self-contained and can run in ~15–20 minutes.
+`04-demo-exec-policy-hooks.md`, `05-demo-ticket-workflow.md` — each is
+self-contained and can run in ~15–20 minutes (Demo 4 only once its own
+pre-work is done).
 
 ## Ground rules for presenting these live
 
@@ -79,5 +92,5 @@ self-contained and can run in ~15–20 minutes.
   wipes the DB volume — which is also exactly the command Demo 3 teaches
   exec-policy to forbid. Comment out that rule temporarily, or just
   `docker compose down -v && docker compose up -d postgres` and re-run
-  `00-setup.md` §1's schema-loading command, if you need to reset
+  `00-setup.md` Step 1's schema-loading command, if you need to reset
   outside the workshop.

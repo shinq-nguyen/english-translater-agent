@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "hooks"))
-from guard_ticket_commit import evaluate, find_active_ticket  # noqa: E402
+from guard_ticket_commit import _extract_command, evaluate, find_active_ticket  # noqa: E402
 
 SCRIPT = Path(__file__).resolve().parents[1] / "hooks" / "guard_ticket_commit.py"
 
@@ -55,6 +55,23 @@ def test_git_status_is_not_treated_as_commit():
     assert evaluate("git status", active_ticket="PROJ-1") is None
 
 
+def test_extract_command_from_dict():
+    assert _extract_command({"command": "git status"}) == "git status"
+
+
+def test_extract_command_from_list():
+    assert _extract_command(["git", "status"]) == "git status"
+
+
+def test_extract_command_from_string():
+    assert _extract_command("git status") == "git status"
+
+
+def test_extract_command_from_none_or_other():
+    assert _extract_command(None) == ""
+    assert _extract_command(42) == "42"
+
+
 def test_find_active_ticket_reads_pointer_file(tmp_path):
     (tmp_path / ".codex").mkdir()
     (tmp_path / ".codex" / "tickets_active").write_text("PROJ-7\n", encoding="utf-8")
@@ -92,6 +109,25 @@ def test_cli_allows_prints_nothing(tmp_path):
     )
     assert out.stdout.strip() == ""
     assert out.returncode == 0
+
+
+def test_cli_tool_input_as_list_exits_zero_and_prints_nothing(tmp_path):
+    # Regression: tool_input isn't guaranteed to be {"command": "..."} —
+    # some tool calls pass it as a raw argv list instead. Before
+    # _extract_command(), `(event.get("tool_input") or {}).get("command")`
+    # crashed with AttributeError ('list' object has no attribute 'get'),
+    # exit code 1 — exactly the failure this test guards against.
+    codex_dir = tmp_path / ".codex"
+    codex_dir.mkdir()
+    (codex_dir / "tickets_active").write_text("PROJ-1", encoding="utf-8")
+    event = {"tool_name": "Bash", "tool_input": ["bash", "-c", "git commit -m bad"]}
+    out = subprocess.run(
+        [sys.executable, str(SCRIPT), str(tmp_path)],
+        input=json.dumps(event),
+        capture_output=True,
+        text=True,
+    )
+    assert out.returncode == 0, out.stderr
 
 
 def test_cli_non_dict_json_stdin_exits_zero_and_prints_nothing(tmp_path):

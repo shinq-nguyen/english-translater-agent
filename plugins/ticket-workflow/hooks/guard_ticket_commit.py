@@ -44,6 +44,23 @@ def _is_git_commit(command):
     return bool(tokens) and tokens[0] == "git" and "commit" in tokens[1:]
 
 
+def _extract_command(tool_input):
+    """tool_input's shape isn't guaranteed to be {"command": "..."} — some
+    tool calls pass it as a raw argv list or a bare string instead of a
+    dict. Handle all three so a shape this hook doesn't expect fails open
+    (empty command, never treated as a commit) instead of crashing with an
+    AttributeError on ``.get()``."""
+    if isinstance(tool_input, dict):
+        command = tool_input.get("command", "")
+    else:
+        command = tool_input
+    if isinstance(command, list):
+        command = " ".join(str(part) for part in command)
+    if not isinstance(command, str):
+        command = "" if command is None else str(command)
+    return command
+
+
 def evaluate(command, active_ticket):
     if not active_ticket:
         return None
@@ -79,14 +96,16 @@ def main(argv):
     if not isinstance(event, dict):
         return 0
 
-    command = (event.get("tool_input") or {}).get("command", "")
-    if isinstance(command, list):
-        command = " ".join(str(part) for part in command)
-
-    active_ticket = find_active_ticket(workflow_root)
-    result = evaluate(command, active_ticket)
-    if result is not None:
-        json.dump(result, sys.stdout)
+    try:
+        command = _extract_command(event.get("tool_input"))
+        active_ticket = find_active_ticket(workflow_root)
+        result = evaluate(command, active_ticket)
+        if result is not None:
+            json.dump(result, sys.stdout)
+    except Exception:
+        # Fail open: a bug in this hook must never be the thing that blocks
+        # a commit, or the whole session.
+        return 0
     return 0
 
 
