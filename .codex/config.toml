@@ -20,7 +20,20 @@ sandbox_mode = "workspace-write"
 approval_policy = "on-request"
 
 [sandbox_workspace_write]
-network_access = false
+# Demo 4 (exec-policy-hooks) deliberately keeps this at `false` to show a
+# git-push escalation. Demo 5 (ticket-workflow) needs it flipped, exactly
+# as demo-guides/04 §"Exec Policy vs Sandbox" anticipates ("later flips
+# network_access = true for an unrelated reason, say to let mvn/npm
+# install fetch packages") — `ticket-be-dev` runs `mvn test` inside its
+# worktree, which needs the network for missing dependencies.
+network_access = true
+# Maven writes resolved dependencies/plugins to the shared local repo
+# below, which sits OUTSIDE every git worktree — without this, each
+# `mvn test` run trips the sandbox and either prompts for elevation on
+# every dependency write or pushes people toward copying `.m2` per
+# worktree (wasteful, and easy to end up stale). Adjust this path if
+# you're running the demo from a different machine/account.
+writable_roots = ["C:/Users/Sinh/.m2/repository"]
 
 # ---------------------------------------------------------------------------
 # Demo 1 — MCP: a read-only Postgres MCP server pointed at the app's own DB.

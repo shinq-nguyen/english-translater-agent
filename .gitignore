@@ -2,3 +2,7 @@
 .codex/logs/
 .superpowers/
 __pycache__/
+tickets/
+.worktrees/
+.codex/tickets_active
+.codex/config.toml.bak

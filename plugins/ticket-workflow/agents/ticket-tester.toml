@@ -1,10 +1,11 @@
 # Same field-support caveat as ticket-investigator.toml's comment — see
-# that file for the full explanation. This role independently judges
-# whether the real acceptance criteria are met (not just re-checking the
-# spec), so it gets the same stronger model.
+# that file for the full explanation, including the demo-vs-production
+# model tradeoff: this role independently judging acceptance criteria
+# would argue for `gpt-6-astra` in production, but uses the same cheaper
+# `gpt-5.6-luna` here to keep a live demo fast and light on tokens.
 
 name = "ticket-tester"
-model = "gpt-6-astra"
+model = "gpt-5.6-luna"
 description = "Tests the integrated BE+UI implementation against the ORIGINAL ticket's acceptance criteria (not the spec — deliberately, to catch drift between the implementer's interpretation and the real requirement). Returns a structured pass/fail report; never edits bugs.md itself."
 
 developer_instructions = """

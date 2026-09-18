@@ -22,6 +22,14 @@ the current state, change only the field(s) that step calls out, and write
 the complete merged object back, or earlier fields (like `ticket_id`,
 `base_branch`, `bug_track_file`) get silently dropped.
 
+**Autonomy within this workflow:** running builds/tests, downloading
+dependencies, creating worktrees, committing, and merging locally are all
+already in scope for this skill — do them without stopping to ask each
+time. Only stop and ask the user when a step below explicitly says to
+(a business decision like `wont-fix`, a merge conflict, a dirty/unexpected
+checkout, `retry_count` exhausted) — not for actions this file has already
+authorized.
+
 ## 0. Resume check and reconciliation — always first, every invocation
 
 ```bash

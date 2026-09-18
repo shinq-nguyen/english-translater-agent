@@ -105,20 +105,25 @@ documents):
 | features / skills | Yes, but disable-only — a role can turn things off, not grant itself anything the parent session doesn't already have |
 | `sandbox_mode` | **No** — parses without error, has zero effect; the role inherits whatever sandbox the parent session is running under |
 
-This plugin uses the whitelist's one clearly-documented lever: the two
-roles that make judgment calls get a stronger model, the two that execute
-an already-designed spec get a faster/cheaper one.
+This plugin uses the whitelist's one clearly-documented lever: `model` per
+role. In production, the two roles that make open-ended judgment calls
+would warrant a stronger model than the two that execute an
+already-designed spec; for a live demo, all four are pinned to the
+cheaper/faster model instead, to keep token spend and wall-clock latency
+down across the whole workflow.
 
 | Role | `model` | Why |
 |---|---|---|
-| `ticket-investigator` | `gpt-6-astra` | Reads the whole target codebase and designs the BE/UI interface — open-ended judgment. |
-| `ticket-tester` | `gpt-6-astra` | Independently judges whether real acceptance criteria are met, not just re-checking the spec. |
+| `ticket-investigator` | `gpt-5.6-luna` | Reads the whole target codebase and designs the BE/UI interface — open-ended judgment that would argue for `gpt-6-astra` in production. |
+| `ticket-tester` | `gpt-5.6-luna` | Independently judges whether real acceptance criteria are met, not just re-checking the spec — same production tradeoff as above. |
 | `ticket-be-dev` | `gpt-5.6-luna` | Implements a spec that's already been designed — closer to mechanical execution. |
 | `ticket-ui-dev` | `gpt-5.6-luna` | Same. |
 
-Those two slugs are what this repo's own Codex install happened to have
-when this was written — run `codex debug models` yourself to see what's
-actually available on yours before copying these verbatim.
+Those slugs are what this repo's own Codex install happened to have when
+this was written — run `codex debug models` yourself to see what's
+actually available on yours before copying these verbatim. For real
+(non-demo) ticket work, swap `ticket-investigator` and `ticket-tester`
+back to your install's strongest model.
 
 ## The full ticket lifecycle
 

@@ -53,6 +53,24 @@ new hooks approved.
 dirty tree — this isn't optional housekeeping, the demo won't start
 without it.
 
+### P3.5 — let Maven write to its shared cache
+
+**Do this:** in `.codex/config.toml`'s `[sandbox_workspace_write]` table,
+set `network_access = true` and add `writable_roots` pointing at your local
+Maven repo (Windows default: `<your-home>/.m2/repository`).
+
+**Expected:** `mvn test` inside a worktree can fetch missing dependencies
+and write them to the shared cache without a per-run approval prompt, and
+without needing to copy `.m2` into each worktree.
+
+**Why:** `ticket-be-dev` runs the backend's own build/test commands
+(`mvn test`) inside `.worktrees/<id>-be` — the worktree itself is inside
+the sandbox's writable workspace, but Maven's local repository is not, and
+without network access it can't fetch anything it doesn't already have
+cached. Demo 4 deliberately leaves both settings restrictive to make its
+own point; this is the flip it anticipates for "an unrelated reason" later
+in the session.
+
 ### P4 — sanity-check the guard
 
 **Do this:** see `plugins/ticket-workflow/README.md`'s install section for

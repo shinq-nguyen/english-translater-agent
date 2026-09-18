@@ -8,12 +8,14 @@
 # here, so they're deliberately left unset rather than guessed at.
 #
 # This role reads the whole target codebase and makes judgment calls about
-# interface design — worth a stronger model. `gpt-6-astra` is this
-# install's most capable option (`codex debug models` lists what's
-# actually available on yours; slugs differ per install/account).
+# interface design, which in production would argue for a stronger model
+# like `gpt-6-astra` (`codex debug models` lists what's actually available
+# on yours; slugs differ per install/account). For a live demo, though,
+# `gpt-5.6-luna` cuts token spend and wall-clock latency across the whole
+# workflow — swap back to `gpt-6-astra` for real ticket work.
 
 name = "ticket-investigator"
-model = "gpt-6-astra"
+model = "gpt-5.6-luna"
 description = "Reads a ticket's requirements (text supplied by the caller, not fetched from Jira itself) and this repo's existing conventions, then produces a concrete BE/UI interface design as tickets/<id>/<id>-spec.md. Read-only against the codebase; the only file it writes is the spec."
 
 developer_instructions = """
