@@ -29,7 +29,7 @@ ticket.
 
 **Do this:** from this repo's root:
 ```bash
-bash plugins/ticket-workflow/install.sh
+bash demo-material/plugins/ticket-workflow/install.sh
 codex                        # trust (if not already)
 ```
 Inside that `codex` session:
@@ -73,7 +73,7 @@ in the session.
 
 ### P4 — sanity-check the guard
 
-**Do this:** see `plugins/ticket-workflow/README.md`'s install section for
+**Do this:** see `demo-material/plugins/ticket-workflow/README.md`'s install section for
 the exact commands.
 
 **Expected:** the guard check passes (README's own success output).

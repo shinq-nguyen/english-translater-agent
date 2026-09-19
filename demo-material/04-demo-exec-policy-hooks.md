@@ -1,6 +1,6 @@
 # Demo 3 — Execution Governance: Exec Policy & Hooks
 
-Covers outline §8. Prerequisite: `demo-guides/00-setup.md` and
+Covers outline §8. Prerequisite: `demo-material/00-setup.md` and
 `01-overview.md` done. This demo deliberately breaks things first so the
 problem is visible, then fixes them one layer at a time.
 
@@ -118,7 +118,7 @@ ran":
   result(s), even across several tool calls in one turn.
 
 > **Verified gotcha:** every hook script here (and
-> `plugins/ticket-workflow/hooks/guard_ticket_commit.py`, if that plugin's
+> `demo-material/plugins/ticket-workflow/hooks/guard_ticket_commit.py`, if that plugin's
 > installed) originally only caught `json.JSONDecodeError` around
 > `json.load(sys.stdin)` — nothing else. `tool_input` is documented as
 > "any shape" (Codex's own schema: `"tool_input": true`), and a Bash call

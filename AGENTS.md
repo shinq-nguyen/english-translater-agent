@@ -47,6 +47,6 @@ Vite.
 This checkout intentionally ships `.codex/` and `.agents/` configuration
 used by the Session 2 demos: an MCP server pointed at the local Postgres, a
 `secret_auditor` subagent, an `add-ai-provider` skill, exec-policy rules,
-and a couple of lifecycle hooks. See `demo-guides/00-setup.md` (machine
-setup, do this first) and `demo-guides/01-overview.md` (what each piece is
+and a couple of lifecycle hooks. See `demo-material/00-setup.md` (machine
+setup, do this first) and `demo-material/01-overview.md` (what each piece is
 for and how to try it yourself).

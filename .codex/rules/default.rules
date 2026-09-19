@@ -5,7 +5,7 @@
 #   codex execpolicy check --pretty --rules .codex/rules/default.rules -- <command...>
 #
 # NOTE for the demo: `pattern` matches an exact argument PREFIX. That is a
-# deliberate, visible limitation here — see demo-guides/04-demo-exec-policy-hooks.md,
+# deliberate, visible limitation here — see demo-material/04-demo-exec-policy-hooks.md,
 # step "the prefix-matching gap". It is why rule #1 below only catches the
 # literal command `cat .env` and NOT `cat ./.env`, `head .env`, `tail -f .env`,
 # or `cat ../.env` from a subdirectory — same file, different exact argument

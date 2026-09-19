@@ -312,7 +312,7 @@ Progress artifacts (all local-only, gitignored by the installer):
 ## Running this plugin's own test suite (dev-only)
 
 ```bash
-cd plugins/ticket-workflow
+cd demo-material/plugins/ticket-workflow
 pip install -r tests/requirements-dev.txt   # dev-only, not needed to just use the plugin
 python -m pytest tests/ -v
 ```

@@ -117,12 +117,13 @@ before writing any config, so it's one less variable while you build and
 test each piece below. (Re-trust is needed again if you re-clone or move
 machines.)
 
-## Step 3 — Write the MCP server config
+## Step 3 — Write the MCP server configs
 
 MCP is just another tool source Codex can call — but it runs as its own
 process, outside Codex's sandbox (more on that in `02-demo-mcp.md`). This
-step points Codex at a read-only Postgres MCP server aimed at the app's
-own database.
+step points Codex at two MCP servers: a read-only Postgres tool aimed at
+the app's own database, and a second, hand-built one you'll write
+yourself in a moment.
 
 **Do this:**
 ```bash
@@ -149,6 +150,15 @@ startup_timeout_sec = 15
 tool_timeout_sec = 30
 enabled = true
 
+# Second MCP server — the one you write below. Off by default; Step 4b of
+# 02-demo-mcp.md is the only place that flips it on.
+[mcp_servers.demo_file_writer]
+command = "node"
+args = ["demo-material/mcp-servers/file-writer/index.js"]
+startup_timeout_sec = 15
+tool_timeout_sec = 30
+enabled = false
+
 # Subagents — cap concurrency so a runaway fan-out can't happen live.
 # The secret_auditor role itself is NOT declared here — Codex auto-discovers
 # it from .codex/agents/secret-auditor.toml (Step 5), no [agents.secret_auditor]
@@ -170,7 +180,8 @@ codex mcp get translator_db
 **Expected:**
 ```
 codex mcp list
-translator_db   Status: enabled
+translator_db      Status: enabled
+demo_file_writer   Status: disabled
 
 codex mcp get translator_db
 command: npx
@@ -179,8 +190,139 @@ tool_timeout_sec: 30
 ```
 
 **Why:** this is the one config file every later demo depends on —
-`config.toml` is where the MCP server, the sandbox/approval defaults, and
-the subagent concurrency caps all live.
+`config.toml` is where both MCP servers, the sandbox/approval defaults,
+and the subagent concurrency caps all live.
+
+### Now write the second server itself
+
+`demo_file_writer` is a from-scratch MCP server: one tool, `write_file`,
+built with the same SDK the archived `server-postgres` package
+(`translator_db`, above) is built with. `02-demo-mcp.md`'s Step 4b covers
+why it exists and how it's used — this is just the typing.
+
+**Do this:**
+```bash
+mkdir -p demo-material/mcp-servers/file-writer
+cat > demo-material/mcp-servers/file-writer/package.json <<'EOF'
+{
+  "name": "demo-file-writer-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Hand-built MCP server for demo-material/02-demo-mcp.md Step 4b — exposes one write_file tool, used to prove Codex's sandbox does not wrap MCP server processes.",
+  "type": "module",
+  "main": "index.js",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  }
+}
+EOF
+cat > demo-material/mcp-servers/file-writer/.gitignore <<'EOF'
+node_modules
+writes/
+EOF
+cat > demo-material/mcp-servers/file-writer/index.js <<'EOF'
+#!/usr/bin/env node
+// demo-material/mcp-servers/file-writer/index.js
+//
+// A minimal, hand-built MCP server for Demo 2 (02-demo-mcp.md), Step 4b.
+// Built with the same SDK the archived `@modelcontextprotocol/server-postgres`
+// package (translator_db, Step 1-3) is built with — same Server/
+// StdioServerTransport/tool-handler shape, stripped down to one tool.
+//
+// Why this exists: translator_db's own `query` tool wraps every call in
+// `BEGIN TRANSACTION READ ONLY`, so it can never actually write anything —
+// which makes it useless for proving that an MCP-driven WRITE survives a
+// tightened Codex sandbox (the write fails either way, for a reason that
+// has nothing to do with sandbox_mode). This server can write a real file,
+// so tightening sandbox_mode to "read-only" and then calling this tool is a
+// real write-vs-write comparison against the shell tool, not a read-vs-write
+// one.
+
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, basename, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const WRITE_DIR = join(HERE, "writes");
+mkdirSync(WRITE_DIR, { recursive: true });
+
+const server = new Server(
+  { name: "demo-file-writer", version: "0.1.0" },
+  { capabilities: { tools: {} } },
+);
+
+server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  tools: [
+    {
+      name: "write_file",
+      description:
+        "Write a text file into this server's own writes/ folder, next to " +
+        "this script. Demo-only tool for showing that Codex's sandbox does " +
+        "not wrap MCP server processes.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "File name only, no path separators.",
+          },
+          content: { type: "string" },
+        },
+        required: ["name", "content"],
+      },
+    },
+  ],
+}));
+
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  if (request.params.name !== "write_file") {
+    throw new Error(`Unknown tool: ${request.params.name}`);
+  }
+
+  const { name, content } = request.params.arguments ?? {};
+  // basename() strips any directory components, so a caller can't escape
+  // WRITE_DIR via "../" — writes always land inside writes/.
+  const safeName = basename(String(name ?? ""));
+  if (!safeName) {
+    throw new Error("name is required");
+  }
+
+  const path = join(WRITE_DIR, safeName);
+  writeFileSync(path, String(content ?? ""), "utf8");
+
+  return {
+    content: [{ type: "text", text: `wrote ${path}` }],
+    isError: false,
+  };
+});
+
+async function runServer() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+
+runServer().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+EOF
+(cd demo-material/mcp-servers/file-writer && npm install)
+```
+
+**Expected:** `npm install` finishes without error, adding
+`@modelcontextprotocol/sdk` under `file-writer/node_modules/` (gitignored
+— nothing to commit). No need to flip `enabled = true` or restart `codex`
+yet — that's `02-demo-mcp.md`'s Step 4b, not this file.
+
+**Why:** writing this now, alongside the rest of the config, means nobody
+has to type JavaScript live during the session — by the time Demo 1
+reaches Step 4b, the file already exists and only needs `enabled = true`.
 
 ## Step 4 — Write the Skill
 
@@ -814,9 +956,9 @@ already loaded.
 | Check | Command | Expect |
 |---|---|---|
 | Codex installed & logged in | `codex --version` / `codex doctor` → `auth` | Version prints; auth not "no credentials" |
-| Config loads clean | `codex doctor` → "Configuration" | `config.toml parse: ok`, `MCP servers: 1` |
+| Config loads clean | `codex doctor` → "Configuration" | `config.toml parse: ok`, `MCP servers: 2` |
 | Database up | `docker compose ps` | `translator-postgres` `running`/`healthy` |
-| **MCP** | `codex mcp list` | `translator_db`, `Status: enabled` |
+| **MCP** | `codex mcp list` | `translator_db`, `Status: enabled` (`demo_file_writer` also listed, `Status: disabled` — Demo 1's Step 4b, off until then) |
 | **Skill** | inside `codex`, `/skills` | `add-ai-provider` listed |
 | **Subagent** | `test -f .codex/agents/secret-auditor.toml` | file exists (auto-discovered) |
 | **Hooks** | inside `codex`, `/hooks` | `block_secrets.py`, `audit_log.py`, `scan_prompt_secrets.py` all listed, approved |

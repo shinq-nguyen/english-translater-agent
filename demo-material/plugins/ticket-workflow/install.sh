@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# plugins/ticket-workflow/install.sh
+# demo-material/plugins/ticket-workflow/install.sh
 #
 # Installs the ticket-workflow plugin into the CURRENT directory (run this
 # from the target repo's root). Copies the skill, subagent roles, and hook

@@ -1,6 +1,6 @@
 # Demo 2 — Skills vs Subagents
 
-Covers outline §7. Prerequisite: `demo-guides/00-setup.md` and
+Covers outline §7. Prerequisite: `demo-material/00-setup.md` and
 `01-overview.md` done.
 
 The point of this demo is NOT "look, Codex can do these two cool things."

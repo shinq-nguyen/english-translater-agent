@@ -30,15 +30,16 @@ that first; everything below assumes it's done.
 ```bash
 cd english-translater-agent
 docker compose ps          # translator-postgres should be running/healthy
-codex doctor                # auth: not "no credentials"; config.toml parse: ok; MCP servers: 1
-codex mcp list               # translator_db, Status: enabled
+codex doctor                # auth: not "no credentials"; config.toml parse: ok; MCP servers: 2
+codex mcp list               # translator_db, Status: enabled; demo_file_writer, Status: disabled
 ```
 
 **Expected:**
 ```
 docker compose ps   → translator-postgres   ...   running (healthy)
-codex doctor        → auth: <not "no credentials">, config.toml parse: ok, MCP servers: 1
-codex mcp list       → translator_db   Status: enabled
+codex doctor        → auth: <not "no credentials">, config.toml parse: ok, MCP servers: 2
+codex mcp list       → translator_db      Status: enabled
+                       demo_file_writer   Status: disabled
 ```
 
 If any of those look wrong, go back to `00-setup.md`'s Step 9 self-check
@@ -54,17 +55,18 @@ it; skip it entirely if a Jira site isn't available.
 ## What's already in the repo
 
 ```
-AGENTS.md                                — repo-level instructions
-.codex/config.toml                       — MCP server + agents + sandbox settings
-.codex/rules/default.rules               — exec-policy rules (Demo 3)
-.codex/hooks.json                        — hook registration (Demo 3)
-.codex/hooks/block_secrets.py            — PreToolUse hook (Demo 3)
-.codex/hooks/audit_log.py                — audit hook, all 3 events (Demo 3)
-.codex/hooks/scan_prompt_secrets.py      — UserPromptSubmit hook (Demo 3)
-.codex/agents/secret-auditor.toml        — subagent definition (Demo 2)
-.agents/skills/add-ai-provider/SKILL.md  — skill definition (Demo 2)
-plugins/ticket-workflow/                 — installable Skill+Subagents+MCP+Hooks plugin (Demo 4)
-demo-guides/                             — these guides
+AGENTS.md                                        — repo-level instructions
+.codex/config.toml                               — MCP server + agents + sandbox settings
+.codex/rules/default.rules                       — exec-policy rules (Demo 3)
+.codex/hooks.json                                — hook registration (Demo 3)
+.codex/hooks/block_secrets.py                    — PreToolUse hook (Demo 3)
+.codex/hooks/audit_log.py                        — audit hook, all 3 events (Demo 3)
+.codex/hooks/scan_prompt_secrets.py              — UserPromptSubmit hook (Demo 3)
+.codex/agents/secret-auditor.toml                — subagent definition (Demo 2)
+.agents/skills/add-ai-provider/SKILL.md          — skill definition (Demo 2)
+demo-material/mcp-servers/file-writer/           — hand-built MCP server (Demo 1, Step 4b)
+demo-material/plugins/ticket-workflow/           — installable Skill+Subagents+MCP+Hooks plugin (Demo 4)
+demo-material/                                   — these guides
 ```
 
 ## One thing worth re-checking at the top of the session

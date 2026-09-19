@@ -2,7 +2,7 @@
 #
 # This file only takes effect once you've trusted this project in Codex
 # (Codex asks the first time it opens an untrusted folder — see
-# demo-guides/01-overview.md). Everything here is scoped to this repo; it
+# demo-material/01-overview.md). Everything here is scoped to this repo; it
 # does not touch your global ~/.codex/config.toml.
 #
 # TOML GOTCHA THAT BIT AN EARLIER VERSION OF THIS FILE: in TOML, every
@@ -22,7 +22,7 @@ approval_policy = "on-request"
 [sandbox_workspace_write]
 # Demo 4 (exec-policy-hooks) deliberately keeps this at `false` to show a
 # git-push escalation. Demo 5 (ticket-workflow) needs it flipped, exactly
-# as demo-guides/04 §"Exec Policy vs Sandbox" anticipates ("later flips
+# as demo-material/04 §"Exec Policy vs Sandbox" anticipates ("later flips
 # network_access = true for an unrelated reason, say to let mvn/npm
 # install fetch packages") — `ticket-be-dev` runs `mvn test` inside its
 # worktree, which needs the network for missing dependencies.
@@ -38,7 +38,7 @@ writable_roots = ["C:/Users/Sinh/.m2/repository"]
 # ---------------------------------------------------------------------------
 # Demo 1 — MCP: a read-only Postgres MCP server pointed at the app's own DB.
 # Requires `docker compose up -d postgres` to be running first (see
-# demo-guides/02-demo-mcp.md).
+# demo-material/02-demo-mcp.md).
 # ---------------------------------------------------------------------------
 [mcp_servers.translator_db]
 command = "npx"
@@ -46,6 +46,26 @@ args = ["-y", "@modelcontextprotocol/server-postgres", "postgresql://translator:
 startup_timeout_sec = 15
 tool_timeout_sec = 30
 enabled = true
+
+# ---------------------------------------------------------------------------
+# Demo 1 — MCP, Step 4b: a hand-built MCP server (one write_file tool) used
+# to prove Codex's sandbox does not wrap MCP server processes. translator_db
+# above can't demonstrate this — its query tool is hard-wired read-only at
+# the Postgres level, so a write through it fails the same way regardless of
+# sandbox_mode. This one actually writes a file, so tightening sandbox_mode
+# to "read-only" and calling it is a real write-vs-write comparison against
+# the shell tool. Off by default — `enabled = false` here means the same
+# thing Step 3b's toggle does: flip it to `true` right before Step 4b, back
+# to `false` after, so it isn't paying context rent on every other demo.
+# Requires `cd demo-material/mcp-servers/file-writer && npm install` once
+# (see 02-demo-mcp.md's Step 4b pre-work).
+# ---------------------------------------------------------------------------
+[mcp_servers.demo_file_writer]
+command = "node"
+args = ["demo-material/mcp-servers/file-writer/index.js"]
+startup_timeout_sec = 15
+tool_timeout_sec = 30
+enabled = false
 
 # ---------------------------------------------------------------------------
 # Demo 2 — Subagents: cap how many can be open concurrently, so a runaway

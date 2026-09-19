@@ -1,0 +1,11 @@
+{
+  "name": "demo-file-writer-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Hand-built MCP server for demo-material/02-demo-mcp.md Step 4b — exposes one write_file tool, used to prove Codex's sandbox does not wrap MCP server processes.",
+  "type": "module",
+  "main": "index.js",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  }
+}
