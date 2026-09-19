@@ -1,12 +1,13 @@
-# Demo 1 — MCP: Extending Codex Capabilities
+# Demo 6 — MCP: Extending Codex Capabilities
 
-Covers outline §6. Prerequisite: `demo-material/00-setup.md` and
+Covers deck slides 27–33. Prerequisite: `demo-material/00-setup.md` and
 `01-overview.md` done (repo trusted, Postgres up, schema loaded).
 
 What you're demonstrating: MCP is just another tool source Codex can pull
 from — but one that runs as its own process, with its own trust boundary,
 and its own cost to every single model call, whether you use it that turn
-or not.
+or not. The local examples use stdio; Demo 9 adds a remote Streamable HTTP
+server so the two transport choices are visible in the same workshop.
 
 **How to read each step:** a "Do this" block (what to type/run), an
 "Expected" block (what you should see), and a short "Why" (the concept
@@ -113,18 +114,34 @@ here, so it falls back to the ambient `approval_policy`).
 Codex gained a new capability — a live read path into the translator's own
 database — with no code written.
 
+### The two connection shapes
+
+The `translator_db` and `demo_file_writer` entries use **stdio**: Codex
+starts a program on the machine and exchanges JSON over its standard input
+and output. Credentials for a local server are normally passed through its
+environment. Demo 9's `atlassian` entry uses **Streamable HTTP** instead:
+Codex connects to a URL owned by someone else and authenticates through
+OAuth (`codex mcp login atlassian`) or a bearer-token environment variable.
+
+The transport changes where the trust sits, not whether the tools become
+available to the model. Both transports add their tools to the same flat
+tool list. Use `/mcp` and `codex mcp list` to verify what actually loaded;
+the presence of a config entry on disk is not evidence that its server is
+connected.
+
 ## Step 3 — Context cost, made visible
 
 Every model call includes the schema of every enabled tool, MCP or not —
 that's the "context cost of MCP" line in the outline.
 
-One honest note before you run this: `codex debug prompt-input` (Session 1
-§1's tool) renders the assembled *instructions* (AGENTS.md, skills list,
-permissions text) — checked directly against a real build of this kit,
-toggling `mcp_servers.translator_db.enabled` produces **no difference** in
-that dump. Tool schemas (what actually costs the tokens) are sent
-separately, as part of the turn's tools list, not in this instructions
-dump — so don't present `prompt-input` as showing the MCP cost.
+One honest note before you run this: `codex debug prompt-input` (Demo 1's
+tool, `02-demo-harness.md`) renders the assembled *instructions*
+(AGENTS.md, skills list, permissions text) — checked directly against a
+real build of this kit, toggling `mcp_servers.translator_db.enabled`
+produces **no difference** in that dump. Tool schemas (what actually
+costs the tokens) are sent separately, as part of the turn's tools list,
+not in this instructions dump — so don't present `prompt-input` as
+showing the MCP cost.
 
 What *is* real and checkable, in two parts:
 
@@ -144,6 +161,13 @@ codex mcp list
 **Expected:** `Status` flips to `disabled`.
 
 Set `enabled` back to `true` when done — later steps and demos need it on.
+
+When a server exposes many tools, narrow the list with its
+`enabled_tools = [...]` setting instead of paying the schema/context cost
+for tools the workflow never uses. Keep a server configured with
+`enabled = false` when it is only needed for one demo: the configuration
+stays available, but the server does not start and its tools do not occupy
+the prompt on every model call.
 
 ## Step 4 — MCP vs Codex's sandbox (the trust-boundary demo)
 

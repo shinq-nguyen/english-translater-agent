@@ -1,6 +1,6 @@
-# Demo 3 — Execution Governance: Exec Policy & Hooks
+# Demo 8 — Execution Governance: Exec Policy & Hooks
 
-Covers outline §8. Prerequisite: `demo-material/00-setup.md` and
+Covers deck slides 43–54. Prerequisite: `demo-material/00-setup.md` and
 `01-overview.md` done. This demo deliberately breaks things first so the
 problem is visible, then fixes them one layer at a time.
 
@@ -35,7 +35,8 @@ transcript.
 
 **Why:** note what did *not* stop this — `sandbox_mode` is
 `workspace-write`, but sandbox modes gate writes and network, not reads.
-This is Session 1 §2's "read access vs security" point, made concrete.
+This is Demo 2's (`03-demo-sandbox-approval.md`) "read access vs
+security" point, made concrete.
 Even switching to `sandbox_mode = "read-only"` wouldn't help; read-only
 still means read access.
 
@@ -166,10 +167,10 @@ call the model made in response — same `turn_id` across that whole
 round, a new `turn_id` for the next prompt. Reading it top to bottom
 *is* the model↔tool conversation: what you asked, what the model decided
 to run, what it got back, and so on — including the MCP tool call from
-Demo 1 if you ran that in the same session.
+Demo 6 if you ran that in the same session.
 
 **Why:** `PreToolUse`/`PostToolUse` fire for every tool, MCP tools
-included — the "MCP is just another tool" point from Demo 1 showing up
+included — the "MCP is just another tool" point from Demo 6 showing up
 again here. Logging the *proposed* call separately from its *result* is
 what makes this replayable as a conversation instead of just a list of
 completed actions: a `PreToolUse` line with no matching `PostToolUse`
@@ -186,9 +187,9 @@ Codex's hook events, in the order they can fire during a turn:
 - **Exec Policy** runs *before* `PreToolUse` even fires for a shell command
   — a `forbidden` verdict means Codex never proposes running it in a form
   that would reach a hook or the sandbox.
-- **`PreToolUse`** hooks run after exec policy/sandbox would otherwise
-  allow the call, but before it executes — the last point where you can
-  still deny or rewrite it (`block_secrets.py` uses this to deny).
+- **`PreToolUse`** hooks run after exec policy accepts the proposal and
+  before the tool executes — the last point where you can still deny or
+  rewrite it (`block_secrets.py` uses this to deny).
 - **`PostToolUse`** hooks run after the tool already executed — useful for
   logging/auditing (`audit_log.py`) or for feeding back extra context, but
   too late to prevent the action itself.
@@ -199,6 +200,46 @@ execution-boundary that's active throughout; Hooks are custom logic you can
 attach at any of several specific lifecycle points, before or after the
 fact, for whatever Exec Policy's static rules don't express (a full
 `.env`-shaped regex, a durable log file, anything else procedural).
+
+### Hook contract and choosing the event
+
+The deck covers twelve lifecycle events; this repo intentionally uses only
+three of them. The useful distinction is when the data first exists:
+
+Hooks are enabled by default. A session or project can turn the feature off
+with the `hooks = false` feature flag, so an absent hook event can mean the
+registration is wrong, the project is untrusted, or hooks were disabled —
+check `/hooks` and the effective config before diagnosing the script.
+
+| Need | Event | Example |
+|---|---|---|
+| Load or refresh project context | `SessionStart` | prepare a session or resume state |
+| Save state before history is discarded | `PreCompact` | persist a checkpoint before compaction |
+| Observe a completed tool call | `PostToolUse` | the shipped audit log |
+| Change or deny a proposed call | `PreToolUse` | the shipped `.env` guard |
+| Check a prompt before the model sees it | `UserPromptSubmit` | the shipped token scanner |
+
+`PreToolUse` can also return a rewritten input when a workflow needs to add
+a safe flag such as `--dry-run`; the shipped guard only denies, so this is
+an extension point rather than another step in the current demo. A valid
+blocking JSON decision (as used by the shipped guards) or exit code `2`
+blocks the action. Exit code `0` with no blocking decision allows it; other
+hook failures are reported while the action can still proceed. The scripts
+in this repo deliberately catch malformed payloads and internal exceptions
+and return `0`, so a broken audit or scanner hook does not become the reason
+the session fails.
+
+For the same reason, hooks are a poor place for a guarantee that must
+survive a broken script. Put hard boundaries in the sandbox or a forbidden
+exec-policy rule; use hooks for observation, redaction, small rewrites, and
+procedural checks. `codex exec --json` does not emit these interactive hook
+events, so a CI process using that mode needs its own audit or enforcement
+path.
+
+On Windows, a portable hook registration may need a
+`command_windows`/`commandWindows` command in addition to the POSIX-style
+`command`, depending on the Codex version. Verify the registered command
+with `/hooks` and run one harmless tool call before relying on it.
 
 ## Step 3 — `UserPromptSubmit`: catching a secret a human pastes in
 

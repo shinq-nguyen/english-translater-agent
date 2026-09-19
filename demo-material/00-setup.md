@@ -6,8 +6,8 @@ hands-on build: starting from a plain `main` checkout, which has **none**
 of this repo's Codex configuration (verified — `main` has no `.codex/`, no
 `.agents/`, not even `AGENTS.md`), you'll write every file yourself: the
 MCP server config, a Skill, a Subagent role, three Hooks, and an
-exec-policy rules file. By the end you'll have the exact setup demos
-`02`–`04` walk through, and — because you typed it — you'll actually know
+exec-policy rules file. By the end you'll have the exact setup Demos 6–8
+(`07`–`09`) walk through, and — because you typed it — you'll actually know
 what each line does instead of just turning something on.
 
 If you'd rather skip the typing and just use a checkout that already has
@@ -56,7 +56,7 @@ cp .env.example .env
 ```
 
 Generate the two local secrets (throwaway values — never reuse real
-secrets here; you'll deliberately try to leak these in Demo 3, so they
+secrets here; you'll deliberately try to leak these in Demo 8, so they
 need to be real strings, not blank):
 ```bash
 python3 - <<'PY'
@@ -95,7 +95,7 @@ docker compose ps
 values (open the file and check if unsure).
 
 **Why:** the demos read real seeded data (e.g. the `roles` table) through
-a live Postgres, and Demo 3 deliberately targets the two secrets you just
+a live Postgres, and Demo 8 deliberately targets the two secrets you just
 generated — both need to exist before anything else in this file works.
 
 ## Step 2 — Trust the project in Codex
@@ -120,7 +120,7 @@ machines.)
 ## Step 3 — Write the MCP server configs
 
 MCP is just another tool source Codex can call — but it runs as its own
-process, outside Codex's sandbox (more on that in `02-demo-mcp.md`). This
+process, outside Codex's sandbox (more on that in `07-demo-mcp.md`). This
 step points Codex at two MCP servers: a read-only Postgres tool aimed at
 the app's own database, and a second, hand-built one you'll write
 yourself in a moment.
@@ -151,7 +151,7 @@ tool_timeout_sec = 30
 enabled = true
 
 # Second MCP server — the one you write below. Off by default; Step 4b of
-# 02-demo-mcp.md is the only place that flips it on.
+# 07-demo-mcp.md is the only place that flips it on.
 [mcp_servers.demo_file_writer]
 command = "node"
 args = ["demo-material/mcp-servers/file-writer/index.js"]
@@ -197,7 +197,7 @@ and the subagent concurrency caps all live.
 
 `demo_file_writer` is a from-scratch MCP server: one tool, `write_file`,
 built with the same SDK the archived `server-postgres` package
-(`translator_db`, above) is built with. `02-demo-mcp.md`'s Step 4b covers
+(`translator_db`, above) is built with. `07-demo-mcp.md`'s Step 4b covers
 why it exists and how it's used — this is just the typing.
 
 **Do this:**
@@ -208,7 +208,7 @@ cat > demo-material/mcp-servers/file-writer/package.json <<'EOF'
   "name": "demo-file-writer-mcp",
   "private": true,
   "version": "0.1.0",
-  "description": "Hand-built MCP server for demo-material/02-demo-mcp.md Step 4b — exposes one write_file tool, used to prove Codex's sandbox does not wrap MCP server processes.",
+  "description": "Hand-built MCP server for demo-material/07-demo-mcp.md Step 4b — exposes one write_file tool, used to prove Codex's sandbox does not wrap MCP server processes.",
   "type": "module",
   "main": "index.js",
   "dependencies": {
@@ -224,7 +224,7 @@ cat > demo-material/mcp-servers/file-writer/index.js <<'EOF'
 #!/usr/bin/env node
 // demo-material/mcp-servers/file-writer/index.js
 //
-// A minimal, hand-built MCP server for Demo 2 (02-demo-mcp.md), Step 4b.
+// A minimal, hand-built MCP server for Demo 6 (07-demo-mcp.md), Step 4b.
 // Built with the same SDK the archived `@modelcontextprotocol/server-postgres`
 // package (translator_db, Step 1-3) is built with — same Server/
 // StdioServerTransport/tool-handler shape, stripped down to one tool.
@@ -318,10 +318,10 @@ EOF
 **Expected:** `npm install` finishes without error, adding
 `@modelcontextprotocol/sdk` under `file-writer/node_modules/` (gitignored
 — nothing to commit). No need to flip `enabled = true` or restart `codex`
-yet — that's `02-demo-mcp.md`'s Step 4b, not this file.
+yet — that's `07-demo-mcp.md`'s Step 4b, not this file.
 
 **Why:** writing this now, alongside the rest of the config, means nobody
-has to type JavaScript live during the session — by the time Demo 1
+has to type JavaScript live during the session — by the time Demo 6
 reaches Step 4b, the file already exists and only needs `enabled = true`.
 
 ## Step 4 — Write the Skill
@@ -398,7 +398,7 @@ description — not the full body shown above.
 
 **Why:** "progressive disclosure" — Codex keeps every skill's short
 description in context all the time (cheap), but only loads the full
-step-by-step body once a task actually matches it (Demo 2 makes this
+step-by-step body once a task actually matches it (Demo 7 makes this
 visible live).
 
 ## Step 5 — Write the Subagent role
@@ -419,7 +419,7 @@ cat > .codex/agents/secret-auditor.toml <<'EOF'
 # without error but is silently dropped, so this role does NOT run in an
 # OS-enforced read-only sandbox — it inherits the parent session's sandbox.
 # "Read-only" here is enforced by the instructions below only, not by a
-# Control — worth proving live in Demo 3 by asking it to write a file.
+# Control — worth proving live in Demo 8 by asking it to write a file.
 
 name = "secret_auditor"
 description = "Read-only investigator for how secrets (APP_JWT_SECRET, AI_MODEL_ENCRYPTION_KEY, saved AI-model API keys) are generated, stored, encrypted, loaded, and possibly logged/exposed across the backend and frontend. Use for a broad, multi-file investigation instead of reading every candidate file from the main thread."
@@ -461,7 +461,7 @@ test -f .codex/agents/secret-auditor.toml && echo ok
 
 **Expected:** `ok` printed.
 
-**Why:** the real test is functional, in `03-demo-skills-vs-subagents.md`
+**Why:** the real test is functional, in `08-demo-skills-vs-subagents.md`
 — ask Codex to delegate to `secret_auditor` and confirm the parent
 transcript only shows the delegation call + summary, not every file it
 read. This step just confirms the file exists in the right place first.
@@ -865,7 +865,7 @@ can lose by scrolling past it in the transcript.
 Exec policy classifies a command's *shape* before it ever reaches
 `PreToolUse` or the sandbox — cheaper and earlier than a hook, but only as
 precise as the prefix you write (see the prefix-matching gap called out in
-`04-demo-exec-policy-hooks.md`, which is exactly why Step 6's hook exists
+`09-demo-exec-policy-hooks.md`, which is exactly why Step 6's hook exists
 too — defense in depth, not either/or).
 
 **Do this:**
@@ -931,7 +931,7 @@ codex execpolicy check --pretty --rules .codex/rules/default.rules -- docker com
 
 **Why:** exec policy runs *before* Codex ever proposes the command in a
 form that would reach a hook or the sandbox — it's the cheapest, earliest
-layer, but only as good as the exact prefixes you wrote (Demo 3 shows the
+layer, but only as good as the exact prefixes you wrote (Demo 8 shows the
 gap live).
 
 ## Step 8 — (Optional but recommended) Write `AGENTS.md`
@@ -958,7 +958,7 @@ already loaded.
 | Codex installed & logged in | `codex --version` / `codex doctor` → `auth` | Version prints; auth not "no credentials" |
 | Config loads clean | `codex doctor` → "Configuration" | `config.toml parse: ok`, `MCP servers: 2` |
 | Database up | `docker compose ps` | `translator-postgres` `running`/`healthy` |
-| **MCP** | `codex mcp list` | `translator_db`, `Status: enabled` (`demo_file_writer` also listed, `Status: disabled` — Demo 1's Step 4b, off until then) |
+| **MCP** | `codex mcp list` | `translator_db`, `Status: enabled` (`demo_file_writer` also listed, `Status: disabled` — Demo 6's Step 4b, off until then) |
 | **Skill** | inside `codex`, `/skills` | `add-ai-provider` listed |
 | **Subagent** | `test -f .codex/agents/secret-auditor.toml` | file exists (auto-discovered) |
 | **Hooks** | inside `codex`, `/hooks` | `block_secrets.py`, `audit_log.py`, `scan_prompt_secrets.py` all listed, approved |
@@ -979,7 +979,7 @@ table.
 Verified on a real Windows 11 machine, not inferred: `sandbox_mode =
 "read-only"` does **not** reliably block a raw network connection (e.g.
 `psql -h localhost`) when Codex runs natively on Windows (PowerShell/cmd,
-outside WSL2). This is why Step 0 says WSL2, and why `02-demo-mcp.md`'s
+outside WSL2). This is why Step 0 says WSL2, and why `07-demo-mcp.md`'s
 Step 4 demo uses a **filesystem write**, not a network call, to show the
 sandbox boundary — that part is enforced reliably on every platform.
 
@@ -1013,7 +1013,7 @@ codex sandbox -c 'sandbox_mode="read-only"' -- cmd /c set | findstr "SBX_NONET_A
 Get-NetFirewallRule -DisplayName "Codex Sandbox Offline*"
 ```
 Filesystem writes don't have this problem — they're checked by the OS's
-own permission system at every level, which is why `02-demo-mcp.md`'s
+own permission system at every level, which is why `07-demo-mcp.md`'s
 trust-boundary demo is built around a blocked file write instead. If you
 specifically want to demo the *network* case, do it inside a real WSL2
 distro (`wsl --install -d Ubuntu` — not the internal `docker-desktop`

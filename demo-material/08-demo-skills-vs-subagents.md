@@ -1,6 +1,6 @@
-# Demo 2 — Skills vs Subagents
+# Demo 7 — Skills vs Subagents
 
-Covers outline §7. Prerequisite: `demo-material/00-setup.md` and
+Covers deck slides 34–42. Prerequisite: `demo-material/00-setup.md` and
 `01-overview.md` done.
 
 The point of this demo is NOT "look, Codex can do these two cool things."
@@ -22,6 +22,12 @@ one"). It only costs context when it's actually relevant — Codex loads just
 the `name` + `description` frontmatter for every skill up front, and only
 pulls in the full body once it picks this one (outline: "progressive
 disclosure").
+
+The frontmatter needs only `name` and `description`. There is no separate
+`trigger` field: trigger phrases belong in the description, because that is
+the text Codex matches against a task. `/skills` shows the catalog, while
+`$add-ai-provider` explicitly selects this skill when the presenter wants
+to remove matching uncertainty from the demo.
 
 ### A1 — see what Codex knows about
 
@@ -89,6 +95,16 @@ this whole kit of something that *looks* like a Control (it names a security
 property, "read-only") but is actually only an Instruction — the kind of
 distinction worth calling out every time you add a subagent.
 
+The same inheritance applies to the parent's MCP servers. A role cannot
+make its own `sandbox_mode`, `approval_policy`, or `mcp_servers` stricter by
+putting those keys in its TOML; those keys parse but are ignored. The
+supported narrowing mechanism is disable-only features, for example
+`[features]` with `shell_tool = false`. Set the parent session's permissions
+before delegating when a child must start from a tighter boundary. Also
+avoid presenting `agents.max_depth` as an enforcement guarantee: the V2
+implementation marks it ignored, so inspect the effective behavior instead
+of trusting that setting in a config file.
+
 ### B1 — Run 1: no delegation (do it "by hand" in the main thread)
 
 **Do this:**
@@ -147,6 +163,7 @@ doesn't.
 
 | Mechanism | How it's invoked | What the parent context gets |
 |---|---|---|
+| Custom prompt file | Explicit `/prompts:<name>` invocation | The prompt content only when called; plain language does not discover the file |
 | AGENTS.md | Always loaded, no invocation | Its full text, every turn (this repo's `AGENTS.md` has been in context since session start) |
 | Skill | Model-matched (implicit) or `$name` (explicit) | Just the description until selected, then the full `SKILL.md` body |
 | Subagent | Explicit ask, or model decides parallelization helps | Only the subagent's final report — its working context is thrown away |
@@ -159,3 +176,8 @@ doesn't.
   and lost shared context isn't worth it for something the main thread could
   just read in one step. Save it for genuinely broad, "read a lot to answer
   one question" work like the secret audit above.
+
+Skills shape the workflow and knowledge available to the current agent;
+Subagents move the reading or implementation into another context. Neither
+one is a security boundary: the child inherits the parent's sandbox and MCP
+access, and instructions in either mechanism can still be ignored.

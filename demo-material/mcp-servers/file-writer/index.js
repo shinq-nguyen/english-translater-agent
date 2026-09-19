@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // demo-material/mcp-servers/file-writer/index.js
 //
-// A minimal, hand-built MCP server for Demo 2 (02-demo-mcp.md), Step 4b.
+// A minimal, hand-built MCP server for Demo 6 (07-demo-mcp.md), Step 4b.
 // Built with the same SDK the archived `@modelcontextprotocol/server-postgres`
 // package (translator_db, Step 1-3) is built with — same Server/
 // StdioServerTransport/tool-handler shape, stripped down to one tool.

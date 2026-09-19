@@ -20,11 +20,12 @@ sandbox_mode = "workspace-write"
 approval_policy = "on-request"
 
 [sandbox_workspace_write]
-# Demo 4 (exec-policy-hooks) deliberately keeps this at `false` to show a
-# git-push escalation. Demo 5 (ticket-workflow) needs it flipped, exactly
-# as demo-material/04 §"Exec Policy vs Sandbox" anticipates ("later flips
-# network_access = true for an unrelated reason, say to let mvn/npm
-# install fetch packages") — `ticket-be-dev` runs `mvn test` inside its
+# Demo 8 (exec-policy-hooks) uses `false` to show a git-push escalation.
+# Demo 9 (ticket-workflow) deliberately flips it to `true`, exactly
+# as described in its P3.5 pre-work. If this checkout already has the Demo 9
+# value, restore `false` before presenting Demo 8.
+# This is the "later flips network_access = true" case described in
+# demo-material/09 §"Exec Policy vs Sandbox"; `ticket-be-dev` runs `mvn test` inside its
 # worktree, which needs the network for missing dependencies.
 network_access = true
 # Maven writes resolved dependencies/plugins to the shared local repo
@@ -36,9 +37,9 @@ network_access = true
 writable_roots = ["C:/Users/Sinh/.m2/repository"]
 
 # ---------------------------------------------------------------------------
-# Demo 1 — MCP: a read-only Postgres MCP server pointed at the app's own DB.
+# Demo 6 — MCP: a read-only Postgres MCP server pointed at the app's own DB.
 # Requires `docker compose up -d postgres` to be running first (see
-# demo-material/02-demo-mcp.md).
+# demo-material/07-demo-mcp.md).
 # ---------------------------------------------------------------------------
 [mcp_servers.translator_db]
 command = "npx"
@@ -48,7 +49,7 @@ tool_timeout_sec = 30
 enabled = true
 
 # ---------------------------------------------------------------------------
-# Demo 1 — MCP, Step 4b: a hand-built MCP server (one write_file tool) used
+# Demo 6 — MCP, Step 4b: a hand-built MCP server (one write_file tool) used
 # to prove Codex's sandbox does not wrap MCP server processes. translator_db
 # above can't demonstrate this — its query tool is hard-wired read-only at
 # the Postgres level, so a write through it fails the same way regardless of
@@ -58,7 +59,7 @@ enabled = true
 # thing Step 3b's toggle does: flip it to `true` right before Step 4b, back
 # to `false` after, so it isn't paying context rent on every other demo.
 # Requires `cd demo-material/mcp-servers/file-writer && npm install` once
-# (see 02-demo-mcp.md's Step 4b pre-work).
+# (see 07-demo-mcp.md's Step 4b pre-work).
 # ---------------------------------------------------------------------------
 [mcp_servers.demo_file_writer]
 command = "node"
@@ -68,7 +69,7 @@ tool_timeout_sec = 30
 enabled = false
 
 # ---------------------------------------------------------------------------
-# Demo 2 — Subagents: cap how many can be open concurrently, so a runaway
+# Demo 7 — Subagents: cap how many can be open concurrently, so a runaway
 # fan-out doesn't happen live. (max_threads is an alias for the real field
 # max_concurrent_threads_per_session.) The secret_auditor role itself is
 # NOT declared here — it's auto-discovered from .codex/agents/secret-auditor.toml,

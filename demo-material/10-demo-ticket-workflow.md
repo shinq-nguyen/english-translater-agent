@@ -1,11 +1,11 @@
-# Demo 4 — Putting Everything Together: a full Skill+Subagents+MCP+Hooks workflow
+# Demo 9 — Putting Everything Together: a full Skill+Subagents+MCP+Hooks workflow
 
-Covers outline §9. This is the session's synthesis demo: everything from
-Demos 1–3 — a Skill deciding the steps, Subagents doing isolated BE/UI/test
-work, MCP as the Jira connection, Hooks as the guardrail — running together
-in one real workflow instead of one mechanism at a time.
+Covers deck slides 55–65. This is the session's synthesis demo: the mechanisms from
+Demos 6–8 — a Skill deciding the steps, Subagents doing isolated BE/UI/test
+work, MCP as the Jira connection, and Hooks as the guardrail — running
+together in one real workflow instead of one mechanism at a time.
 
-Unlike `02`–`04`, this demo needs its own pre-work — a real Jira Cloud
+Unlike Demos 1–8, this demo needs its own pre-work — a real Jira Cloud
 site — since it exercises a real OAuth-based remote MCP server rather than
 this repo's local Postgres. If a Jira site isn't available, this demo can't
 run; there's no local substitute for it.
@@ -67,7 +67,7 @@ without needing to copy `.m2` into each worktree.
 (`mvn test`) inside `.worktrees/<id>-be` — the worktree itself is inside
 the sandbox's writable workspace, but Maven's local repository is not, and
 without network access it can't fetch anything it doesn't already have
-cached. Demo 4 deliberately leaves both settings restrictive to make its
+cached. Demo 9 deliberately leaves both settings restrictive to make its
 own point; this is the flip it anticipates for "an unrelated reason" later
 in the session.
 
@@ -118,15 +118,15 @@ subagents → MCP calls).
 - `tickets/<ID>/bugs.md`, if the tester finds anything
 - `tickets/<ID>/audit.log` growing alongside `.codex/logs/audit.log` —
   `ticket_audit.py` (one of the plugin's own two hooks, from P2) extends
-  Demo 3's `audit_log.py` pattern with the active ticket ID and phase, so
+  Demo 8's `audit_log.py` pattern with the active ticket ID and phase, so
   a session that gets interrupted (next step) still leaves a durable
   trace of exactly where it was, independent of the transcript.
 
-**Why:** each of these is a different mechanism from Demos 1–3 showing up
+**Why:** each of these is a different mechanism from Demos 6–8 showing up
 together in one real workflow — the Skill decides the steps, Subagents do
 the isolated BE/UI/test work, MCP is the Jira connection, `state.json` is
 what makes the whole thing resumable (next step), and the audit trail is
-Demo 3's Hooks mechanism reused for this workflow's own bookkeeping.
+Demo 8's Hooks mechanism reused for this workflow's own bookkeeping.
 
 ### R3 — show resumability live
 
