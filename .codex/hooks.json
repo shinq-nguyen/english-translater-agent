@@ -19,8 +19,7 @@
             "type": "command",
             "command": "python .codex/hooks/audit_log.py",
             "timeout": 10,
-            "statusMessage": "Recording proposed tool call",
-            "async": true
+            "statusMessage": "Recording proposed tool call"
           }
         ]
       }
@@ -33,8 +32,7 @@
             "type": "command",
             "command": "python .codex/hooks/audit_log.py",
             "timeout": 10,
-            "statusMessage": "Recording tool result",
-            "async": true
+            "statusMessage": "Recording tool result"
           }
         ]
       }
@@ -58,8 +56,109 @@
             "type": "command",
             "command": "python .codex/hooks/audit_log.py",
             "timeout": 10,
-            "statusMessage": "Recording prompt",
-            "async": true
+            "statusMessage": "Recording prompt"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .codex/hooks/audit_log.py",
+            "timeout": 30,
+            "statusMessage": "Recording assistant response and transcript"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .codex/hooks/audit_log.py",
+            "timeout": 10,
+            "statusMessage": "Recording subagent start"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .codex/hooks/audit_log.py",
+            "timeout": 30,
+            "statusMessage": "Recording subagent response"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .codex/hooks/audit_log.py",
+            "timeout": 10,
+            "statusMessage": "Recording session start"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "other",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .codex/hooks/audit_log.py",
+            "timeout": 3,
+            "statusMessage": "Recording session end"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .codex/hooks/audit_log.py",
+            "timeout": 10,
+            "statusMessage": "Recording pre-compaction state"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .codex/hooks/audit_log.py",
+            "timeout": 10,
+            "statusMessage": "Recording post-compaction state"
+          }
+        ]
+      }
+    ],
+    "Interrupt": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .codex/hooks/audit_log.py",
+            "timeout": 3,
+            "statusMessage": "Recording interrupted turn"
           }
         ]
       }
