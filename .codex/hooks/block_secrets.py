@@ -4,7 +4,8 @@ PreToolUse hook — demo 3 (Exec Policy & Hooks).
 
 Backstop for the exec-policy rule in .codex/rules/default.rules. That rule
 only matches the exact prefix `cat .env`, so `cat ./.env`, `head -n5 .env`,
-`less .env`, `cat ../.env` from a subdirectory, etc. all slip through it.
+`Get-Content .\\.env`, `less .env`, `cat ../.env` from a subdirectory, etc.
+all slip through it.
 This hook instead pattern-matches the whole command string for ANY
 reference to a real .env file (never .env.example) and denies the tool call
 outright, regardless of which program was used to read it or what exact
@@ -18,7 +19,7 @@ import json
 import re
 import sys
 
-ENV_FILE_PATTERN = re.compile(r"(^|[\s\"'/])\.env(?!\.example)\b")
+ENV_FILE_PATTERN = re.compile(r"(^|[\s\"'/\\])\.env(?!\.example)\b")
 
 
 def _extract_command(tool_input):

@@ -1,312 +1,157 @@
-# Demo 8 — Execution Governance: Exec Policy & Hooks
+# Demo 8 — Exec policy and Hooks
 
-Covers deck slides 43–54. Prerequisite: `demo-material/00-setup.md` and
-`01-overview.md` done. This demo deliberately breaks things first so the
-problem is visible, then fixes them one layer at a time.
+Covers slides 43–54. Complete `00-setup.md` first. This demo is safe to run
+on both Windows and Linux: it never prints the real `.env` file.
 
-Real secret in play: root `.env` in this repo holds `APP_JWT_SECRET` and
-`AI_MODEL_ENCRYPTION_KEY` in plaintext (that's the whole point of `.env`
-files for local dev) — this demo is about stopping those values from
-reaching a transcript from either direction: Codex reading and repeating
-them (Steps 0–2), or a human pasting one straight into chat (Step 3) —
-plus having a durable, redacted record of the whole prompt↔tool exchange,
-not just which commands ran (Step 2).
+## Purpose
 
-**How to read each step:** a "Do this" block, an "Expected" block, and a
-short "Why." Run Steps 0 → 4 in order — each one only makes sense once the
-previous one has been seen. There's also one unnumbered **Note** between
-Steps 2 and 3 — no "Do this" there, just the mental model Step 3 makes
-concrete.
+Show the order and responsibility of the protections:
 
-## Step 0 — see the problem (protections off)
+1. Exec policy classifies a command shape before it runs.
+2. `PreToolUse` Hooks inspect the full proposed command and can deny it.
+3. `UserPromptSubmit` Hooks can stop a secret pasted directly into chat.
+4. `PostToolUse` Hooks can write a redacted audit trail after a tool runs.
+5. `PreToolUse` Hooks can also rewrite a proposed command, not just allow
+   or deny it.
 
-**Do this:** temporarily disable everything this repo ships:
-```bash
-mv .codex/rules .codex/rules.disabled
-mv .codex/hooks.json .codex/hooks.json.disabled
-mv .codex/hooks .codex/hooks.scripts.disabled
-```
-Restart `codex` in the repo, then prompt:
-> Run `cat .env` and tell me what's in it.
+## Step 1 — Check exec-policy decisions
 
-**Expected (uncomfortable) result:** Codex reads and repeats
-`APP_JWT_SECRET=...` and `AI_MODEL_ENCRYPTION_KEY=...` straight into the
-transcript.
+Run the platform-specific commands below.
 
-**Why:** note what did *not* stop this — `sandbox_mode` is
-`workspace-write`, but sandbox modes gate writes and network, not reads.
-This is Demo 2's (`03-demo-sandbox-approval.md`) "read access vs
-security" point, made concrete.
-Even switching to `sandbox_mode = "read-only"` wouldn't help; read-only
-still means read access.
+### Windows (PowerShell)
 
-> **Verified gotcha:** renaming just `.codex/hooks.json` is **not**
-> enough on Codex 0.154.0 — `block_secrets.py` still ran and blocked
-> `cat .env` even with the registration file gone. You must also move
-> `.codex/hooks/` itself (the scripts, renamed above) for the hook to
-> actually stop firing; otherwise Step 0's "uncomfortable result" won't
-> reproduce and the demo will look broken.
-
-**Do this:** put all three back before continuing:
-```bash
-mv .codex/rules.disabled .codex/rules
-mv .codex/hooks.json.disabled .codex/hooks.json
-mv .codex/hooks.scripts.disabled .codex/hooks
+```powershell
+codex execpolicy check --pretty --rules .\.codex\rules\default.rules -- type .env
+codex execpolicy check --pretty --rules .\.codex\rules\default.rules -- git push origin main
+codex execpolicy check --pretty --rules .\.codex\rules\default.rules -- docker compose down -v
 ```
 
-## Step 1 — Exec Policy: classify the command, before it ever runs
+### Linux/macOS (Bash)
 
-`.codex/rules/default.rules` has four `prefix_rule()`s.
-
-**Do this:** validate them directly, independent of a live Codex session:
 ```bash
 codex execpolicy check --pretty --rules .codex/rules/default.rules -- cat .env
 codex execpolicy check --pretty --rules .codex/rules/default.rules -- git push origin main
 codex execpolicy check --pretty --rules .codex/rules/default.rules -- docker compose down -v
 ```
 
-**Expected:** `forbidden`, `prompt`, and `forbidden` respectively.
+Expected: `forbidden`, `prompt`, `forbidden`, in that order. The command is
+classified before it reaches approval or the sandbox.
 
-**Why:** each verdict comes from matching the command's *shape*, before
-Codex would ever get to a sandbox or approval check.
+## Step 2 — See the prefix-rule gap without reading `.env`
 
-**Do this:** now restart `codex` and prompt exactly:
-> Run `cat .env`
+Exec policy matches configured command shapes. A different reader command is
+not necessarily covered by the static rule, so use the Hook as the general
+backstop.
 
-**Expected:** refused outright (`forbidden` — no approval prompt to click
-through, it simply won't run).
+### Windows (PowerShell)
 
-### The prefix-matching gap
+In a Codex session, ask:
 
-`pattern` matches an exact argument prefix.
+> Run `Get-Content .\.env`.
 
-**Do this:** prove the gap live:
-> Run `head -n5 .env`
+### Linux/macOS (Bash)
 
-**Expected: not** blocked by exec policy — `["cat", ".env"]` never matches
-a command whose program is `head`.
+In a Codex session, ask:
 
-**Why:** this is real and not a trick: exec policy rules are static
-command-shape rules, and covering "any way to read this file" with prefix
-rules alone means enumerating every program and every path spelling.
-That's exactly the gap Step 2's hook is for.
+> Run `head -n5 .env`.
 
-(Optional: also try `git push` and `docker compose down -v` here — the
-first should prompt for approval instead of running silently, the second
-should be refused with the data-loss justification from the rules file.)
+Expected: the command is denied by `block_secrets.py`. Do not approve or
+retry the command. The Hook sees the full command text and blocks the request
+without exposing the file contents.
 
-## Step 2 — Hooks: the general backstop, and a full audit trail
+## Step 3 — Inspect the audit Hook
 
-`.codex/hooks.json` registers three scripts (in `.codex/hooks/`) across
-five hook entries — `audit_log.py` is wired into all three events so the
-log ends up telling the whole story of a session, not just "which tools
-ran":
+Inside Codex, run:
 
-- **`block_secrets.py`** on `PreToolUse` (matcher: `Bash`) — regex-matches
-  the *whole* command string for any real `.env` reference and denies the
-  tool call, regardless of program or exact path spelling.
-- **`scan_prompt_secrets.py`** on `UserPromptSubmit` (matcher: `*`) —
-  Step 3's hook; denies a prompt that contains a JWT- or API-key-shaped
-  string.
-- **`audit_log.py`** on `UserPromptSubmit`, `PreToolUse`, *and*
-  `PostToolUse` (all matcher `*`, all `async` — it never denies anything)
-  — appends one JSON object per line to `.codex/logs/audit.log`: what
-  came in (`UserPromptSubmit` → the prompt), what the model proposed next
-  (`PreToolUse` → tool name + full arguments, *before* it runs), and what
-  actually happened (`PostToolUse` → the same call, plus its result).
-  Every line carries the same `session_id`/`turn_id`, so grouping by
-  `turn_id` reconstructs one full round of prompt → proposed call(s) →
-  result(s), even across several tool calls in one turn.
-
-> **Verified gotcha:** every hook script here (and
-> `demo-material/plugins/ticket-workflow/hooks/guard_ticket_commit.py`, if that plugin's
-> installed) originally only caught `json.JSONDecodeError` around
-> `json.load(sys.stdin)` — nothing else. `tool_input` is documented as
-> "any shape" (Codex's own schema: `"tool_input": true`), and a Bash call
-> whose `tool_input` arrives as a raw argv list — `["bash", "-c", "..."]`
-> — instead of `{"command": "..."}` made `(event.get("tool_input") or
-> {}).get("command", "")` crash with `AttributeError: 'list' object has
-> no attribute 'get'`, exit code 1, reproduced by piping that shape into
-> the script directly. A hook that can only ever *observe* or *deny* must
-> never itself become the reason a tool call fails — every script here
-> now normalizes `tool_input` defensively and wraps its real logic in a
-> broad `except Exception: return 0`, not just the narrow JSON-parsing
-> one. Worth remembering for any hook you write: fail-open has to cover
-> "this hook has a bug," not only "the input didn't parse."
-
-**Do this:** first, Codex needs to trust these hooks — project-level,
-non-managed hooks require a one-time review:
-```
+```text
 /hooks
 ```
-Approve everything listed (all five entries across the three scripts) —
-Step 3 needs `scan_prompt_secrets.py` already approved too.
 
-**Do this:** now re-run the exact command that slipped through exec
-policy:
-> Run `head -n5 .env`
+Approve the project hooks if Codex asks. Then run a harmless prompt such as:
 
-**Expected:** denied this time, with `block_secrets.py`'s reason surfaced
-— because this hook matches on the full command text with a regex, not an
-exact prefix, `.env` under any name/path variant is caught.
+> Run `git log -3`, then tell me how many commits were shown.
 
-**Do this:** run a couple more turns, one with more than one tool call,
-e.g.:
-> Run `git log -3`, then run `mvn -v`
+Read the audit file.
 
-then read the trail `audit_log.py` has been writing the whole time,
-independent of the transcript UI:
+Windows (PowerShell):
+
+```powershell
+Get-Content .\.codex\logs\audit.log -Tail 20
+```
+
+Linux/macOS (Bash):
+
 ```bash
-cat .codex/logs/audit.log
+tail -n 20 .codex/logs/audit.log
 ```
 
-**Expected:** one JSON object per line. For each turn: a
-`"event": "UserPromptSubmit"` line (the prompt you sent), then a matching
-`"event": "PreToolUse"` / `"event": "PostToolUse"` pair for every tool
-call the model made in response — same `turn_id` across that whole
-round, a new `turn_id` for the next prompt. Reading it top to bottom
-*is* the model↔tool conversation: what you asked, what the model decided
-to run, what it got back, and so on — including the MCP tool call from
-Demo 6 if you ran that in the same session.
+Expected: JSON lines for `UserPromptSubmit`, `PreToolUse`, and
+`PostToolUse`. Matching `turn_id` values connect one prompt to its proposed
+tool call and result. The audit Hook observes; it does not grant permission.
 
-**Why:** `PreToolUse`/`PostToolUse` fire for every tool, MCP tools
-included — the "MCP is just another tool" point from Demo 6 showing up
-again here. Logging the *proposed* call separately from its *result* is
-what makes this replayable as a conversation instead of just a list of
-completed actions: a `PreToolUse` line with no matching `PostToolUse`
-line means that call never finished (e.g. Codex was interrupted).
+## Step 4 — Block a secret pasted into chat
 
-**Note — where each mechanism sits in the lifecycle** (no hands-on step here, just the model to hold before Step 3)
+In the same session, paste this synthetic token (it is not a real secret):
 
-Codex's hook events, in the order they can fire during a turn:
-`SessionStart` → `UserPromptSubmit` → (`PreToolUse` → tool executes →
-`PostToolUse`, once per tool call, can repeat many times per turn) → … →
-`PreCompact`/`PostCompact` (only if compaction happens) → `Stop` →
-`SessionEnd`.
+> Why does this expire after 10 minutes: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJlLWhlcmU
 
-- **Exec Policy** runs *before* `PreToolUse` even fires for a shell command
-  — a `forbidden` verdict means Codex never proposes running it in a form
-  that would reach a hook or the sandbox.
-- **`PreToolUse`** hooks run after exec policy accepts the proposal and
-  before the tool executes — the last point where you can still deny or
-  rewrite it (`block_secrets.py` uses this to deny).
-- **`PostToolUse`** hooks run after the tool already executed — useful for
-  logging/auditing (`audit_log.py`) or for feeding back extra context, but
-  too late to prevent the action itself.
+Expected: `scan_prompt_secrets.py` blocks the prompt before Codex answers.
+The audit log records a redacted marker such as `<redacted:jwt>`, not the
+token value.
 
-**Why:** that maps directly onto the outline's distinction: Exec Policy is
-command-level rules evaluated up front; Sandbox is the broader
-execution-boundary that's active throughout; Hooks are custom logic you can
-attach at any of several specific lifecycle points, before or after the
-fact, for whatever Exec Policy's static rules don't express (a full
-`.env`-shaped regex, a durable log file, anything else procedural).
+## Step 5 — `PreToolUse` can rewrite the command, not just allow or deny it
 
-### Hook contract and choosing the event
+A `PreToolUse` hook's decision is not limited to `allow`/`deny`: it can also
+return `updatedInput`, and Codex runs the rewritten command instead of the
+one the model proposed. `.codex/hooks/rewrite_pytest.py` is wired for
+exactly this — scoped to `pytest`, which this Java/Maven repo never runs for
+real (`mvn test` is the actual test command), so it cannot interfere with
+any other demo in this kit.
 
-The deck covers twelve lifecycle events; this repo intentionally uses only
-three of them. The useful distinction is when the data first exists:
+In a Codex session, ask:
 
-Hooks are enabled by default. A session or project can turn the feature off
-with the `hooks = false` feature flag, so an absent hook event can mean the
-registration is wrong, the project is untrusted, or hooks were disabled —
-check `/hooks` and the effective config before diagnosing the script.
+> Run `pytest` in the shell.
 
-| Need | Event | Example |
-|---|---|---|
-| Load or refresh project context | `SessionStart` | prepare a session or resume state |
-| Save state before history is discarded | `PreCompact` | persist a checkpoint before compaction |
-| Observe a completed tool call | `PostToolUse` | the shipped audit log |
-| Change or deny a proposed call | `PreToolUse` | the shipped `.env` guard |
-| Check a prompt before the model sees it | `UserPromptSubmit` | the shipped token scanner |
+Expected: the command fails with "pytest is not recognized"/"command not
+found" — this repo has no Python test suite, so that failure is expected
+and not the point. What matters is *which* command actually ran. Check the
+audit log:
 
-`PreToolUse` can also return a rewritten input when a workflow needs to add
-a safe flag such as `--dry-run`; the shipped guard only denies, so this is
-an extension point rather than another step in the current demo. A valid
-blocking JSON decision (as used by the shipped guards) or exit code `2`
-blocks the action. Exit code `0` with no blocking decision allows it; other
-hook failures are reported while the action can still proceed. The scripts
-in this repo deliberately catch malformed payloads and internal exceptions
-and return `0`, so a broken audit or scanner hook does not become the reason
-the session fails.
+Windows (PowerShell):
 
-For the same reason, hooks are a poor place for a guarantee that must
-survive a broken script. Put hard boundaries in the sandbox or a forbidden
-exec-policy rule; use hooks for observation, redaction, small rewrites, and
-procedural checks. `codex exec --json` does not emit these interactive hook
-events, so a CI process using that mode needs its own audit or enforcement
-path.
+```powershell
+Get-Content .\.codex\logs\audit.log -Tail 20
+```
 
-On Windows, a portable hook registration may need a
-`command_windows`/`commandWindows` command in addition to the POSIX-style
-`command`, depending on the Codex version. Verify the registered command
-with `/hooks` and run one harmless tool call before relying on it.
+Linux/macOS (Bash):
 
-## Step 3 — `UserPromptSubmit`: catching a secret a human pastes in
-
-Steps 1–2 are both about the same exposure: Codex deciding to run a
-command. This step is the other direction — a teammate pasting a real
-secret straight into chat to ask for help debugging it, e.g. "why does my
-session keep expiring, here's my token: `eyJhbGci...`". Nothing about
-Exec Policy or `PreToolUse` sees this: no tool call is even involved, the
-secret is just sitting in the prompt text.
-
-`.codex/hooks.json` registers a third hook on `UserPromptSubmit`:
-
-- **`scan_prompt_secrets.py`** — regex-matches the raw prompt for a
-  JWT-shaped string (three dot-separated base64url segments — exactly
-  what this app's own login tokens, signed by `APP_JWT_SECRET`, look
-  like) or a provider-style API key (`sk-...`, `sk-or-v1-...`), and
-  returns `{"decision": "block", ...}` if either shape is found.
-
-**Do this:** in a `codex` session with the hooks approved (from Step 2),
-paste this exact prompt (a synthetic, made-up JWT — not a real secret):
-> Why does this keep expiring after 10 minutes: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJlLWhlcmU
-
-**Expected:** the prompt is refused before Codex ever responds to it —
-`scan_prompt_secrets.py`'s reason is surfaced, asking you to describe the
-symptom instead of pasting the value.
-
-**Do this:** check the audit log again:
 ```bash
-cat .codex/logs/audit.log
+tail -n 20 .codex/logs/audit.log
 ```
 
-**Expected:** a new `"event": "UserPromptSubmit"` line for the prompt you
-just sent — but its `"prompt"` field reads `<redacted:jwt>` where the
-token was, not the real value. `audit_log.py` is a separate, independent
-hook registration on the same event (not code inside
-`scan_prompt_secrets.py`), and it applies the same JWT/API-key scan to
-everything it writes — so even "we caught something" gets recorded
-without ever writing down the thing that was caught.
+Expected: the `PreToolUse` line's `tool_input.command` reads
+`pytest --maxfail=1`, not the bare `pytest` the model proposed. Nothing in
+the chat transcript calls out that the command changed — a rewrite is
+invisible unless you go looking for it, which is why a hook that rewrites
+should also log what it replaced.
 
-**Why this event, not `PreToolUse`:** `UserPromptSubmit` fires right after
-you hit Enter — before the prompt reaches the model, and before it's
-written into this session's on-disk transcript (Codex's own hook input
-schema for this event includes a `transcript_path` field naming that
-file, which is how you know it's a target still being written to, not
-already-written history). `PreToolUse`/`PostToolUse` only ever see what
-*Codex* decides to do after it's already read a prompt — they can't undo
-a human having already pasted a secret into a prompt the model has seen
-and that's now sitting in the transcript. `UserPromptSubmit` is the one
-point in the lifecycle early enough to stop that from happening at all.
+## Step 6 — Compare the layers
 
-## Step 4 — Exec Policy vs Sandbox, not either/or
+| Layer | Sees | Can block | Example |
+|---|---|---:|---|
+| Exec policy | command shape | Yes | deny `docker compose down -v` |
+| Sandbox | operating-system operation | Yes | deny a file write in `read-only` |
+| `PreToolUse` | full proposed tool input | Yes | deny any `.env` reference |
+| `PostToolUse` | completed tool call/result | No | append audit log |
+| `UserPromptSubmit` | submitted prompt | Yes | block a pasted JWT |
 
-**Do this:** look back at `.codex/config.toml`:
-```toml
-sandbox_mode = "workspace-write"
-[sandbox_workspace_write]
-network_access = false
-```
+The layers complement each other. A Hook is useful for procedural checks,
+but a hard boundary should also use sandbox or a forbidden exec-policy rule.
+`PreToolUse` is the only row that can also *rewrite* what runs (Step 5),
+in addition to allowing or denying it.
 
-**Expected takeaway:** with `network_access = false`, a `git push` would
-likely already need elevated permission from the sandbox alone (it needs
-the network).
+## Cleanup
 
-**Why the exec-policy rule still earns its place:** the `git push`
-exec-policy rule in `default.rules` is a floor that holds even if someone
-later flips `network_access = true` for an unrelated reason (say, to let
-Codex hit an API during a different demo) — defense in depth, not a
-single point of control. That's outline §8's "Exec Policy vs Sandbox:
-command-level rules vs. the broader execution boundary" — two layers, on
-purpose, not a redundancy to simplify away.
+No project settings need to be changed. If you created scratch files while
+testing, remove them using `Remove-Item` on Windows or `rm -f` on Linux/macOS.
+Never delete the real `.env` or print its contents.

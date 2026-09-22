@@ -1,7 +1,8 @@
 # Demo 7 — Skills vs Subagents
 
 Covers deck slides 34–42. Prerequisite: `demo-material/00-setup.md` and
-`01-overview.md` done.
+`01-overview.md` done. The commands in this demo run inside Codex and are
+the same on Windows/PowerShell and Linux/macOS/Bash.
 
 The point of this demo is NOT "look, Codex can do these two cool things."
 It's that Skills and Subagents solve *different* problems — reusable
@@ -9,6 +10,13 @@ know-how vs. context isolation — and mixing them up leads to the wrong
 tool for the job. AGENTS.md is the third mechanism in the same family;
 it's already in play the whole workshop (this repo's root `AGENTS.md`),
 so this demo focuses on telling Skills and Subagents apart.
+
+## Purpose
+
+Use one task to compare a Skill's reusable workflow with a Subagent's
+isolated working context. The expected result is not faster execution; it is
+the right instructions for the Skill and a smaller parent transcript for the
+Subagent.
 
 **How to read each step:** a "Do this" block, an "Expected" block, and a
 short "Why." Part A and Part B are independent — run either first.

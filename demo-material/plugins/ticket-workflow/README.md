@@ -84,8 +84,8 @@ flowchart TB
 | `hooks/ticket_audit.py` | PostToolUse hook on every tool call. Appends one line per call to `tickets/<ID>/audit.log` — a durable trace that survives a lost session, independent of any transcript. |
 | `hooks/verify_step.py` | Not a lifecycle hook — a gate script the Skill runs explicitly after each phase (`spec_ready`, `dev_round`, `done`). Re-derives the truth from git (commit trailers, merge-base ancestry, checkout cleanliness) and from `bugs.md`'s actual rows, rather than trusting what the Skill or a subagent already wrote to `state.json`. Exit 0 = phase satisfied, non-zero = not yet, with the reason on stdout. |
 | `hooks/state_io.py` | Atomic read/write for `state.json` (writes to a `.tmp` file and `os.replace()`s it — never a half-written file after an interruption). |
-| `hooks/merge_config.py` | Key-aware TOML merge used only by `install.sh`, to add this plugin's MCP/feature config into an existing `.codex/config.toml` without clobbering anything already there. |
-| `install.sh` + `*-snippet.*` | Copies everything above into a target repo and merges the config/hooks snippets in. Idempotent — safe to re-run. |
+| `hooks/merge_config.py` | Key-aware TOML merge used by both installers, to add this plugin's MCP/feature config into an existing `.codex/config.toml` without clobbering anything already there. |
+| `install.sh` / `install.ps1` + `*-snippet.*` | Copies everything above into a target repo and merges the config/hooks snippets in. Idempotent — safe to re-run on Linux/macOS or Windows. |
 
 ### Configuring a subagent (model, per-role tuning)
 
@@ -240,40 +240,62 @@ call a ticket done.
 
 ## Install
 
-From the target repo's root:
+From the target repo's root, choose one installer.
+
+Windows (PowerShell):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\demo-material\plugins\ticket-workflow\install.ps1
+```
+
+Linux/macOS (Bash):
 
 ```bash
 bash /path/to/plugins/ticket-workflow/install.sh
 ```
 
-This copies the skill, the 4 subagent roles, and the hook scripts into
+Both installers copy the skill, the 4 subagent roles, and the hook scripts into
 `.agents/skills/` and `.codex/`, and key-merges (never blindly overwrites)
 the MCP/feature config into `.codex/config.toml` and the two new hooks into
 `.codex/hooks.json`. Safe to re-run — it's idempotent.
 
-Then:
-```bash
-codex                        # trust the project (required once)
+Then, on either platform:
+
+```text
+codex
 ```
 Inside that session, run `/hooks` and approve the two new hooks
 (`guard_ticket_commit.py`, `ticket_audit.py`) — project-level hooks need
 this explicit approval before they're active.
 
 If the target repo tracks `.codex/config.toml`/`.codex/hooks.json` (as this
-one does), commit (or stash) the files `install.sh` just added/modified
+one does), commit (or stash) the files the installer just added/modified
 before running `implement ticket ...` — the Skill's entry preconditions
 require a clean checkout to start.
 
 **Sanity-check the commit guard** before relying on it (a bare terminal
 `git commit` never triggers a Codex hook — hooks only fire for tool calls
-Codex's own agent loop makes):
+Codex's own agent loop makes).
+
+Windows (PowerShell):
+
+```powershell
+Set-Content .codex/tickets_active "DEMO-1"
+'{"tool_name":"Bash","tool_input":{"command":"git commit -m \"bad message\""}}' |
+  python .codex/hooks/guard_ticket_commit.py
+Remove-Item .codex/tickets_active
+```
+
+Linux/macOS (Bash):
+
 ```bash
 echo DEMO-1 > .codex/tickets_active
 echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"bad message\""}}' \
-  | python .codex/hooks/guard_ticket_commit.py
-# expect JSON with permissionDecision: "deny"
+  | python3 .codex/hooks/guard_ticket_commit.py
 rm .codex/tickets_active
 ```
+
+Expected: JSON containing `permissionDecision: "deny"`.
 
 Finally:
 ```bash
@@ -311,8 +333,18 @@ Progress artifacts (all local-only, gitignored by the installer):
 
 ## Running this plugin's own test suite (dev-only)
 
+Windows (PowerShell):
+
+```powershell
+Set-Location demo-material\plugins\ticket-workflow
+python -m pip install -r tests\requirements-dev.txt
+python -m pytest tests -v
+```
+
+Linux/macOS (Bash):
+
 ```bash
 cd demo-material/plugins/ticket-workflow
-pip install -r tests/requirements-dev.txt   # dev-only, not needed to just use the plugin
-python -m pytest tests/ -v
+python3 -m pip install -r tests/requirements-dev.txt
+python3 -m pytest tests/ -v
 ```

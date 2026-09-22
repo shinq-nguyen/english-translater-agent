@@ -9,8 +9,8 @@
 # step "the prefix-matching gap". It is why rule #1 below only catches the
 # literal command `cat .env` and NOT `cat ./.env`, `head .env`, `tail -f .env`,
 # or `cat ../.env` from a subdirectory — same file, different exact argument
-# string. The PreToolUse hook in .codex/hooks.json is the more general
-# backstop for exactly that gap.
+# string. The Windows `type`/`Get-Content` forms below cover the common native
+# commands. The PreToolUse hook in .codex/hooks.json is the general backstop.
 
 # 1. Never let Codex print the root .env (APP_JWT_SECRET, AI_MODEL_ENCRYPTION_KEY
 #    live there in plaintext) straight into the transcript.
@@ -20,6 +20,24 @@ prefix_rule(
     justification = "Root .env holds APP_JWT_SECRET and AI_MODEL_ENCRYPTION_KEY in plaintext.",
     match = ["cat .env"],
     not_match = ["cat .env.example", "cat ./.env", "head .env"],
+)
+
+# Windows cmd.exe form.
+prefix_rule(
+    pattern = ["type", ".env"],
+    decision = "forbidden",
+    justification = "Root .env holds APP_JWT_SECRET and AI_MODEL_ENCRYPTION_KEY in plaintext.",
+    match = ["type .env"],
+    not_match = ["type .env.example"],
+)
+
+# Windows PowerShell form.
+prefix_rule(
+    pattern = ["Get-Content", ".env"],
+    decision = "forbidden",
+    justification = "Root .env holds APP_JWT_SECRET and AI_MODEL_ENCRYPTION_KEY in plaintext.",
+    match = ["Get-Content .env"],
+    not_match = ["Get-Content .env.example"],
 )
 
 # 2. printenv can dump secrets that are only in the shell's environment

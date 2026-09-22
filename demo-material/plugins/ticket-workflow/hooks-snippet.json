@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .codex/hooks/guard_ticket_commit.py",
+            "command": "python3 .codex/hooks/guard_ticket_commit.py",
+            "command_windows": "python .codex/hooks/guard_ticket_commit.py",
             "timeout": 10,
             "statusMessage": "Checking commit message against active ticket"
           }
@@ -19,7 +20,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .codex/hooks/ticket_audit.py",
+            "command": "python3 .codex/hooks/ticket_audit.py",
+            "command_windows": "python .codex/hooks/ticket_audit.py",
             "timeout": 10,
             "statusMessage": "Writing ticket-workflow audit log entry",
             "async": true

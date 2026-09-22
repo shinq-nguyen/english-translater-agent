@@ -16,6 +16,11 @@ repo, if present — this file is the operational summary.
 are relative to `workflow_root`, never to any subagent's own working
 directory.
 
+Platform note: Git commands work on both platforms. On Windows PowerShell,
+run Python helpers with `python`; on Linux/macOS Bash, run them with
+`python3`. When creating or removing `.codex/tickets_active`, use the shell
+syntax for your platform instead of copying the other shell's redirection.
+
 `state_io.py write` replaces the entire state.json file, not just the
 fields mentioned in a given step — so every write below must first `read`
 the current state, change only the field(s) that step calls out, and write
@@ -35,6 +40,9 @@ authorized.
 ```bash
 python .codex/hooks/state_io.py read "tickets/<TICKET-ID>/state.json"
 ```
+
+Windows equivalent: `python .codex/hooks/state_io.py read
+"tickets/<TICKET-ID>/state.json"`.
 
 If it returns `null`: this is a fresh ticket, start at step 1.
 
@@ -74,7 +82,9 @@ later `verify_step.py` check reads `ticket_id` and `bug_track_file` from
 this file and they are never written again after this step — set them here
 or the `dev_round`/`done` gates fail closed on every real ticket. As part of
 this same step, write the ticket ID to `.codex/tickets_active`
-(`echo "<TICKET-ID>" > .codex/tickets_active`) — this is the pointer file
+(`Set-Content .codex/tickets_active "<TICKET-ID>"` on Windows;
+`printf '%s\n' "<TICKET-ID>" > .codex/tickets_active` on Linux/macOS) — this
+is the pointer file
 `guard_ticket_commit.py` and `ticket_audit.py` read to know a ticket
 workflow is active; without it, both hooks stay permanently inert.
 
@@ -198,4 +208,6 @@ this is never automatic, and the row records it as user-approved.
    git worktree remove .worktrees/<TICKET-ID>-ui
    ```
 5. Set `phase: "summarized"`. Clear the active-ticket pointer file
-   (`rm -f .codex/tickets_active`). Report the summary to the user. Done.
+   (`Remove-Item .codex/tickets_active -ErrorAction SilentlyContinue` on
+   Windows; `rm -f .codex/tickets_active` on Linux/macOS). Report the summary
+   to the user. Done.

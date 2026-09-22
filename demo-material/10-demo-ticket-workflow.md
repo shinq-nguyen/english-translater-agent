@@ -10,6 +10,16 @@ site — since it exercises a real OAuth-based remote MCP server rather than
 this repo's local Postgres. If a Jira site isn't available, this demo can't
 run; there's no local substitute for it.
 
+**Platform:** Windows uses PowerShell and `install.ps1`; Linux/macOS uses
+Bash and `install.sh`. Codex prompts and Jira OAuth steps are the same on
+both platforms.
+
+## Purpose
+
+Show the complete workflow in one place: a Skill orchestrates, Subagents
+implement and test in isolated worktrees, MCP connects Jira, and Hooks record
+and guard the workflow. This demo requires a real throwaway Jira ticket.
+
 **How to read this file:** a "Do this" block per step, an "Expected"
 block for what should appear, and a short "Why" where it's not obvious.
 Complete every "Pre-work" step before the "Running the demo" section.
@@ -27,7 +37,13 @@ ticket.
 
 ### P2 — install the plugin
 
-**Do this:** from this repo's root:
+**Do this — Windows (PowerShell):** from this repo's root:
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\demo-material\plugins\ticket-workflow\install.ps1
+codex
+```
+
+**Do this — Linux/macOS (Bash):** from this repo's root:
 ```bash
 bash demo-material/plugins/ticket-workflow/install.sh
 codex                        # trust (if not already)
@@ -38,12 +54,12 @@ Inside that `codex` session:
 ```
 Approve the two new hooks.
 
-**Expected:** `install.sh` finishes without error; `/hooks` shows the two
+**Expected:** the installer finishes without error; `/hooks` shows the two
 new hooks approved.
 
 ### P3 — commit or stash what the installer touched
 
-**Do this:** commit (or stash) the files `install.sh` just added/modified
+**Do this:** commit (or stash) the files the installer just added/modified
 (`.agents/skills/`, `.codex/agents/`, `.codex/hooks/`, `.codex/config.toml`,
 `.codex/hooks.json`, `.gitignore`) so the checkout is clean.
 
@@ -57,7 +73,8 @@ without it.
 
 **Do this:** in `.codex/config.toml`'s `[sandbox_workspace_write]` table,
 set `network_access = true` and add `writable_roots` pointing at your local
-Maven repo (Windows default: `<your-home>/.m2/repository`).
+Maven repo. On Windows use `C:/Users/<name>/.m2/repository`; on Linux/macOS
+use `/home/<name>/.m2/repository`.
 
 **Expected:** `mvn test` inside a worktree can fetch missing dependencies
 and write them to the shared cache without a per-run approval prompt, and
@@ -80,7 +97,7 @@ the exact commands.
 
 ### P5 — log in to Jira
 
-**Do this:**
+**Do this (same command on both platforms):**
 ```bash
 codex mcp login atlassian
 ```
@@ -131,7 +148,7 @@ Demo 8's Hooks mechanism reused for this workflow's own bookkeeping.
 ### R3 — show resumability live
 
 **Do this:**
-1. Interrupt the session (`Ctrl+D`) mid-`fixing`.
+1. Interrupt the session (`Ctrl+C`) mid-`fixing`.
 2. Start a fresh `codex` session, say `implement ticket <YOUR-TICKET-ID>`
    again.
 

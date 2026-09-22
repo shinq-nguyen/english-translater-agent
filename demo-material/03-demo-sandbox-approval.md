@@ -1,126 +1,133 @@
 # Demo 2 — Sandbox vs. Approval
 
-Covers deck slides 8–13. Prerequisite: `01-overview.md` done.
+Covers slides 8–13. No database or model-specific setup is required. Use the
+Windows or Linux/macOS command variant shown in each step.
 
-What you're demonstrating: `sandbox_mode` and `approval_policy` answer two
-completely different questions — "what is Codex *allowed* to do" (a wall,
-enforced by the OS) vs. "when does Codex *ask* me first" (a question, just
-a terminal prompt). The deck's own framing: a command can be dangerous and
-never asked about, and a harmless command can prompt every time. Neither
-"it asked me" nor "it didn't ask" tells you what the sandbox would have
-allowed.
+## Purpose
 
-## Step 1 — The three sandbox modes, one command each
+Show the difference between two independent controls:
 
-**Do this:** run the same write attempt under all three modes, no live
-session needed (`codex sandbox` skips the model entirely — see Demo 1's
-(`02-demo-harness.md`) Step 1):
-```bash
-# read-only
+- `sandbox_mode`: what a command is allowed to change.
+- `approval_policy`: when Codex asks the user for permission to go beyond
+  the sandbox.
+
+An approval prompt does not mean that the sandbox allowed the operation, and
+no prompt does not mean that the operation was safe.
+
+## Step 1 — Compare the three sandbox modes
+
+Run the same write once in each mode.
+
+### Windows (PowerShell)
+
+```powershell
 codex sandbox -c 'sandbox_mode="read-only"' -- cmd.exe /c "echo test > sbx_test.txt"
-ls sbx_test.txt 2>&1   # should error — no file
+Test-Path .\sbx_test.txt
 
-# workspace-write
 codex sandbox -c 'sandbox_mode="workspace-write"' -- cmd.exe /c "echo test > sbx_test.txt"
-ls sbx_test.txt 2>&1   # should exist now
-rm -f sbx_test.txt
+Test-Path .\sbx_test.txt
+Remove-Item .\sbx_test.txt -ErrorAction SilentlyContinue
 
-# danger-full-access
 codex sandbox -c 'sandbox_mode="danger-full-access"' -- cmd.exe /c "echo test > sbx_test.txt"
-ls sbx_test.txt 2>&1   # should exist
+Test-Path .\sbx_test.txt
+Remove-Item .\sbx_test.txt -ErrorAction SilentlyContinue
+```
+
+### Linux/macOS (Bash)
+
+```bash
+codex sandbox -c 'sandbox_mode="read-only"' -- sh -c 'echo test > sbx_test.txt'
+test -e sbx_test.txt
+
+codex sandbox -c 'sandbox_mode="workspace-write"' -- sh -c 'echo test > sbx_test.txt'
+test -e sbx_test.txt
+rm -f sbx_test.txt
+
+codex sandbox -c 'sandbox_mode="danger-full-access"' -- sh -c 'echo test > sbx_test.txt'
+test -e sbx_test.txt
 rm -f sbx_test.txt
 ```
-On WSL2/macOS/Linux, swap the `cmd.exe /c "..."` tail for
-`sh -c 'echo test > sbx_test.txt'` (see `00-setup.md`'s Step 3 note on why
-native-Windows and POSIX forms aren't interchangeable here).
 
-**Expected:** the write is blocked only under `read-only`; it succeeds
-under both `workspace-write` and `danger-full-access`.
+Expected:
 
-**Why:** three modes, one axis — what Codex may *change*.
-`workspace-write` (this repo's actual default — check
-`.codex/config.toml`) allows writes inside the working directory and any
-`writable_roots`; `danger-full-access` means no sandbox at all. Reading is
-never blocked in *any* of the three — proven next.
+- `read-only`: the command is denied and the file does not exist.
+- `workspace-write`: the command succeeds and the file exists.
+- `danger-full-access`: the command succeeds and the file exists.
 
-## Step 2 — The gap: read-only does not mean it cannot read
+The only variable is `sandbox_mode`; there is no model or approval prompt in
+this command. This isolates the enforcement boundary.
 
-**Do this:**
+## Step 2 — `read-only` does not block reads
+
+Use a harmless test file, never `.env`.
+
+### Windows (PowerShell)
+
+```powershell
+New-Item -ItemType Directory -Force .\demo-material\scratch | Out-Null
+Set-Content .\demo-material\scratch\read-test.txt "readable"
+codex sandbox -c 'sandbox_mode="read-only"' -- cmd.exe /c "type demo-material\scratch\read-test.txt"
+Remove-Item .\demo-material\scratch\read-test.txt
+```
+
+### Linux/macOS (Bash)
+
 ```bash
-codex sandbox -c 'sandbox_mode="read-only"' -- cmd.exe /c "type .env"
+mkdir -p demo-material/scratch
+printf 'readable\n' > demo-material/scratch/read-test.txt
+codex sandbox -c 'sandbox_mode="read-only"' -- sh -c 'cat demo-material/scratch/read-test.txt'
+rm -f demo-material/scratch/read-test.txt
 ```
-(WSL2/macOS/Linux: `sh -c 'cat .env'`.)
 
-**Expected:** the command succeeds and prints `.env`'s contents (or, if
-your `.env` is empty/missing locally, at minimum the command does **not**
-fail with a permission error the way Step 1's write did — compare exit
-codes if the file's empty).
+Expected: the command prints `readable`. `read-only` blocks writes; it does
+not protect file contents from being read. Do not use a real secret file for
+this test.
 
-**Why:** this is the deck's single most-surprising slide. The sandbox
-controls *writes* and *network*, never reads, in any mode — `cat .env`
-succeeds in `read-only` exactly as it would in `workspace-write`. A secret
-you actually care about needs to live **outside** the folder Codex works
-in; `sandbox_mode` was never a confidentiality boundary. (Demo 8,
-`09-demo-exec-policy-hooks.md`, covers the one mechanism that *can* stop
-this — a `PreToolUse` hook — but a hook is a check that can fail open, not
-a wall like the sandbox.)
+## Step 3 — See approval and sandbox work independently
 
-## Step 3 — Sandbox and approval are independent settings
+1. Start a Codex session in this repository. Confirm the project defaults
+   with `/status`: `workspace-write` and `on-request`.
+2. Ask Codex:
 
-**Do this:** in a live `codex` session in this repo, with the project
-default (`sandbox_mode = "workspace-write"`, `approval_policy =
-"on-request"`), ask it to do something that writes inside the repo, e.g.:
-> Create a file `demo-material/scratch/step3.txt` containing the text
-> "hello".
+   > Create `demo-material/scratch/step3.txt` containing `hello`.
 
-**Expected:** the write just happens — no approval prompt. Compare
-against Step 1: the OS would have refused this same write under
-`read-only`, prompt or not. Here, under `workspace-write`, it's silently
-allowed — no prompt, because `on-request` only asks about things the
-sandbox alone wouldn't already handle.
+Expected: the file is created without an approval prompt because the project
+sandbox already allows writes inside the workspace.
 
-**Do this next:** ask it to touch a file *outside* the repo and outside
-any `writable_roots` in `.codex/config.toml` — e.g. (adjust the path for
-your OS):
-> Create a file at `~/codex-demo-outside-test.txt` containing "hello".
+3. Ask Codex to create a file outside the repository, for example:
 
-**Expected:** this time you get an approval prompt (or, on `never`, a
-silent refusal) — the write reaches outside what `workspace-write` covers
-on its own, so `approval_policy` is what decides whether Codex gets to ask
-you for an exception.
+   > Create `<TEMP>\codex-approval-test.txt` containing `hello`.
 
-**Why:** two axes, not one. `read-only` + `never` runs everything
-sandboxed, asks nothing — "the sandbox is already answering," as the deck
-puts it. `workspace-write` + `on-request` (this repo's default) only
-prompts for the *escalations* the sandbox alone can't grant — exactly what
-Step 3 showed. Neither setting is a weaker or stronger version of the
-other; they're answers to different questions.
+   Replace `<TEMP>` with the path printed by PowerShell:
 
-## Step 4 — Check what's actually in effect, live
+   Windows PowerShell: `$env:TEMP`
+   Linux/macOS Bash: `${TMPDIR:-/tmp}`
 
-**Do this:** inside a `codex` session:
-```
+Expected: Codex asks for approval because the write is outside the normal
+workspace boundary. If the policy is `never`, it is refused instead.
+
+The same operation can therefore be allowed silently, asked about, or
+refused depending on both settings.
+
+## Step 4 — Check the effective settings
+
+Inside the same Codex session, run:
+
+```text
 /status
-```
-then
-```
 /permissions
 ```
 
-**Expected:** `/status` reports the sandbox mode and approval policy
-currently in effect for *this* session — which may not match what's on
-disk if you passed a `-c` flag or changed it mid-session with
-`/permissions`. `/permissions` lets you change either one for the rest of
-this session only (doesn't touch `config.toml`).
-
-**Why:** the deck's habit to build: never conclude "it's configured"
-because a file on disk says so — conclude it from `/status` in the
-session you're actually in. Demo 3 (`04-demo-configuration.md`) is
-entirely about why the file on disk and the setting actually in effect
-diverge more often than you'd expect.
+Expected: `/status` shows the settings active in this session. `/permissions`
+can change them for the session, but does not edit `.codex/config.toml`.
 
 ## Cleanup
 
-Delete anything Step 3 created (`demo-material/scratch/step3.txt`, the
-outside-repo test file) and confirm `.codex/config.toml` still has
-`sandbox_mode = "workspace-write"` before moving on to another demo.
+Remove `demo-material/scratch/step3.txt` and the temporary file outside the
+repository. On Windows use `Remove-Item`; on Linux/macOS use `rm -f`.
+Confirm that `.codex/config.toml` still has:
+
+```toml
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"
+```

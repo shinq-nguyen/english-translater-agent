@@ -6,9 +6,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .codex/hooks/block_secrets.py",
+            "command": "python3 .codex/hooks/block_secrets.py",
+            "command_windows": "python .codex/hooks/block_secrets.py",
             "timeout": 10,
             "statusMessage": "Checking command against .env-file policy"
+          },
+          {
+            "type": "command",
+            "command": "python3 .codex/hooks/rewrite_pytest.py",
+            "command_windows": "python .codex/hooks/rewrite_pytest.py",
+            "timeout": 10,
+            "statusMessage": "Checking for a pytest command to rewrite"
           }
         ]
       },
@@ -17,7 +25,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .codex/hooks/audit_log.py",
+            "command": "python3 .codex/hooks/audit_log.py",
+            "command_windows": "python .codex/hooks/audit_log.py",
             "timeout": 10,
             "statusMessage": "Recording proposed tool call"
           }
@@ -30,7 +39,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .codex/hooks/audit_log.py",
+            "command": "python3 .codex/hooks/audit_log.py",
+            "command_windows": "python .codex/hooks/audit_log.py",
             "timeout": 10,
             "statusMessage": "Recording tool result"
           }
@@ -43,7 +53,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .codex/hooks/scan_prompt_secrets.py",
+            "command": "python3 .codex/hooks/scan_prompt_secrets.py",
+            "command_windows": "python .codex/hooks/scan_prompt_secrets.py",
             "timeout": 10,
             "statusMessage": "Scanning prompt for pasted tokens/keys"
           }
@@ -54,7 +65,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .codex/hooks/audit_log.py",
+            "command": "python3 .codex/hooks/audit_log.py",
+            "command_windows": "python .codex/hooks/audit_log.py",
             "timeout": 10,
             "statusMessage": "Recording prompt"
           }
@@ -66,7 +78,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .codex/hooks/audit_log.py",
+            "command": "python3 .codex/hooks/audit_log.py",
+            "command_windows": "python .codex/hooks/audit_log.py",
             "timeout": 30,
             "statusMessage": "Recording assistant response and transcript"
           }
@@ -79,7 +92,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .codex/hooks/audit_log.py",
+            "command": "python3 .codex/hooks/audit_log.py",
+            "command_windows": "python .codex/hooks/audit_log.py",
             "timeout": 10,
             "statusMessage": "Recording subagent start"
           }
@@ -92,7 +106,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .codex/hooks/audit_log.py",
+            "command": "python3 .codex/hooks/audit_log.py",
+            "command_windows": "python .codex/hooks/audit_log.py",
             "timeout": 30,
             "statusMessage": "Recording subagent response"
           }
@@ -105,7 +120,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .codex/hooks/audit_log.py",
+            "command": "python3 .codex/hooks/audit_log.py",
+            "command_windows": "python .codex/hooks/audit_log.py",
             "timeout": 10,
             "statusMessage": "Recording session start"
           }
@@ -118,7 +134,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .codex/hooks/audit_log.py",
+            "command": "python3 .codex/hooks/audit_log.py",
+            "command_windows": "python .codex/hooks/audit_log.py",
             "timeout": 3,
             "statusMessage": "Recording session end"
           }
@@ -131,7 +148,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .codex/hooks/audit_log.py",
+            "command": "python3 .codex/hooks/audit_log.py",
+            "command_windows": "python .codex/hooks/audit_log.py",
             "timeout": 10,
             "statusMessage": "Recording pre-compaction state"
           }
@@ -144,7 +162,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .codex/hooks/audit_log.py",
+            "command": "python3 .codex/hooks/audit_log.py",
+            "command_windows": "python .codex/hooks/audit_log.py",
             "timeout": 10,
             "statusMessage": "Recording post-compaction state"
           }
@@ -157,6 +176,7 @@
           {
             "type": "command",
             "command": "python .codex/hooks/audit_log.py",
+            "command_windows": "python .codex/hooks/audit_log.py",
             "timeout": 3,
             "statusMessage": "Recording interrupted turn"
           }

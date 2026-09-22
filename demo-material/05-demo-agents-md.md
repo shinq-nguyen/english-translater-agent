@@ -1,164 +1,206 @@
 # Demo 4 — AGENTS.md
 
-Covers deck slides 17–20. Prerequisite: `01-overview.md` done. This demo
-builds a **separate scratch git repo** outside `english-translater-agent`
-so nobody has to touch this repo's real `AGENTS.md` — full steps below.
+Covers slides 17–20. It uses a throwaway git repository. The real
+repository `AGENTS.md` is not modified. Use the Windows or Linux/macOS setup
+below.
 
-What you're demonstrating: AGENTS.md files are *collected*, not chosen —
-every file from the repo root down to your current folder gets glued
-together and sent as one block, every call — and that block has a single,
-shared size budget, spent from the root down. A big root file can silently
-delete your most specific rules before Codex ever sees them, with no
-error and nothing in the transcript.
+## Purpose
 
-## Step 1 — See this repo's own AGENTS.md reach the model, verbatim
+Show three properties of `AGENTS.md`:
 
-**Do this:** in `english-translater-agent`, with nothing else set up:
-```bash
-codex debug prompt-input
+- instructions are collected from the repository root to the current folder;
+- `AGENTS.override.md` replaces the instruction file in its own folder;
+- a large file near the root can silently exhaust the shared 32 KiB budget
+  before Codex ever reaches a smaller, more specific file;
+- instructions are guidance for the model, not an enforcement boundary.
+
+## Step 1 — See the real repository instructions
+
+From `english_translater`, run:
+
+```powershell
+codex debug prompt-input > (Join-Path $env:TEMP "codex-prompt.json")
+Select-String -Path (Join-Path $env:TEMP "codex-prompt.json") -Pattern "AGENTS.md instructions"
 ```
-Find the message whose text starts with `# AGENTS.md instructions for`.
 
-**Expected:** the full text of this repo's root `AGENTS.md` — headings,
-the "Where things live" list, the `.env` warning — wrapped verbatim inside
-an `<INSTRUCTIONS>` tag, as one `user`-role message.
+Expected: the output contains the root `AGENTS.md` text inside the assembled
+instructions. It is sent as content; it is not a permission rule.
 
-**Why:** this is not a summary or an excerpt — it's the file's exact
-content, sent as-is. Whatever tone or precision you write into
-`AGENTS.md`, that's exactly what the model reads, unedited.
+## Step 2 — Root and nested files are combined
 
-## Step 2 — Build a throwaway repo to see concatenation happen
+Create a small git repository:
 
-**Do this:**
+### Windows (PowerShell)
+
+```powershell
+$demoRoot = Join-Path $env:TEMP "agents-md-demo"
+New-Item -ItemType Directory -Force (Join-Path $demoRoot "sub") | Out-Null
+Set-Location $demoRoot
+git init -q
+Set-Content .\AGENTS.md "ROOT_MARKER: root instructions"
+Set-Content .\sub\AGENTS.md "SUB_MARKER: sub instructions"
+git add -A
+git -c user.email=demo@example.com -c user.name=demo commit -q -m init
+Set-Location .\sub
+codex debug prompt-input > (Join-Path $env:TEMP "agents-prompt.json")
+Select-String -Path (Join-Path $env:TEMP "agents-prompt.json") -Pattern "ROOT_MARKER|SUB_MARKER"
+```
+
+### Linux/macOS (Bash)
+
 ```bash
-mkdir -p /tmp/agents-md-demo/sub
-cd /tmp/agents-md-demo
-git init -q .
-echo "ROOT_MARKER: this is the root AGENTS.md" > AGENTS.md
-echo "SUB_MARKER: this is sub/AGENTS.md, closer to where you're working" > sub/AGENTS.md
-git add -A && git -c user.email=a@b.c -c user.name=demo commit -q -m init
+demoRoot="${TMPDIR:-/tmp}/agents-md-demo"
+mkdir -p "$demoRoot/sub"
+cd "$demoRoot"
+git init -q
+printf '%s\n' 'ROOT_MARKER: root instructions' > AGENTS.md
+printf '%s\n' 'SUB_MARKER: sub instructions' > sub/AGENTS.md
+git add -A
+git -c user.email=demo@example.com -c user.name=demo commit -q -m init
 cd sub
-codex debug prompt-input | grep -A3 "AGENTS.md instructions"
+codex debug prompt-input > "${TMPDIR:-/tmp}/agents-prompt.json"
+grep -E 'ROOT_MARKER|SUB_MARKER' "${TMPDIR:-/tmp}/agents-prompt.json"
 ```
 
-**Expected:** one combined block, containing **both** `ROOT_MARKER` *and*
-`SUB_MARKER` — `ROOT_MARKER` first, `SUB_MARKER` after it — even though
-you're running from `sub/`, two directories away from the root file.
+Expected: both markers appear, with `ROOT_MARKER` before `SUB_MARKER`.
+The nested file adds to the root file; it does not replace it.
 
-**Why:** confirms the deck's claim directly — there's no "nearest file
-wins." Every `AGENTS.md` on the path from the repo root down to your `cwd`
-is joined together, root first, and handed to the model as one message. A
-deeper file **adds** to the ones above it; it doesn't replace them.
+## Step 3 — An override replaces the local file
 
-**Worth noting, not in the deck:** this concatenation only kicked in once
-`/tmp/agents-md-demo` was an actual git repo (`git init` above) — the same
-two files in a plain, non-git directory only produce the closest one
-(`sub/AGENTS.md`), with no root file included at all. Codex appears to use
-the git repo boundary to decide how far up to walk — worth keeping in
-mind if a demo "isn't finding" a root AGENTS.md and the folder in question
-turns out not to be a git repo yet.
+From the same `sub` folder:
 
-## Step 3 — The one exception: `AGENTS.override.md` replaces, not adds
+Both platforms run the same check. Use `Set-Content` on Windows and
+`printf` on Linux/macOS:
 
-Everything in Step 2 was about concatenation — files *add* to each other.
-There's exactly one named exception the deck calls out: an
-`AGENTS.override.md` sitting next to a folder's own `AGENTS.md` replaces
-that folder's `AGENTS.md` in the assembled block, instead of both being
-glued together. It's scoped to its own folder only — it doesn't touch
-`AGENTS.md` files anywhere else on the path.
+Windows:
 
-**Do this**, still in `/tmp/agents-md-demo` (from Step 2, `sub/AGENTS.md`
-still holds `SUB_MARKER`):
+```powershell
+Set-Content .\AGENTS.override.md "OVERRIDE_MARKER: replacement instructions"
+codex debug prompt-input > (Join-Path $env:TEMP "agents-prompt.json")
+Select-String -Path (Join-Path $env:TEMP "agents-prompt.json") -Pattern "ROOT_MARKER|SUB_MARKER|OVERRIDE_MARKER"
+```
+
+Linux/macOS:
+
 ```bash
-cd /tmp/agents-md-demo
-echo "OVERRIDE_MARKER: this is sub/AGENTS.override.md" > sub/AGENTS.override.md
-git add -A && git -c user.email=a@b.c -c user.name=demo commit -q -m "add override"
-cd sub
-codex debug prompt-input > /tmp/pi.json
-grep -c "ROOT_MARKER" /tmp/pi.json
-grep -c "SUB_MARKER" /tmp/pi.json
-grep -c "OVERRIDE_MARKER" /tmp/pi.json
+printf '%s\n' 'OVERRIDE_MARKER: replacement instructions' > AGENTS.override.md
+codex debug prompt-input > "${TMPDIR:-/tmp}/agents-prompt.json"
+grep -E 'ROOT_MARKER|SUB_MARKER|OVERRIDE_MARKER' "${TMPDIR:-/tmp}/agents-prompt.json"
 ```
 
-**Expected:** `ROOT_MARKER` still found (**1**) — the parent folder's
-`AGENTS.md` is untouched by an override two directories below it.
-`SUB_MARKER` is now **gone** (**0**) — `sub/AGENTS.md` itself was never
-sent. `OVERRIDE_MARKER` is found (**1**) in its place. Look at the
-message header too: it still just reads `# AGENTS.md instructions for
-.../sub` — nothing in the label tells you it's actually
-`AGENTS.override.md`'s content underneath, not `AGENTS.md`'s.
+Expected:
 
-**Why:** this is the one place in the whole collection model where a file
-*replaces* instead of adding — scoped strictly to its own folder, not
-inherited or applied to any other folder on the path (Step 2's
-`ROOT_MARKER` proves that: an override two levels down never touched it).
-Worth knowing before you go looking for why an `AGENTS.md` you just wrote
-in a folder doesn't seem to be taking effect — check for a sibling
-`AGENTS.override.md` first, since nothing in the transcript announces
-that substitution either, the same "silent" theme as Step 4's budget cut.
+- `ROOT_MARKER` is still present.
+- `SUB_MARKER` is absent.
+- `OVERRIDE_MARKER` is present.
 
-## Step 4 — Blow the budget, and watch a file vanish with no error
+The override affects only its own folder. It replaces `sub\AGENTS.md`; it
+does not replace the root file.
 
-**Do this**, still in `/tmp/agents-md-demo` — first remove Step 3's
-override so it doesn't confound this test (its whole point was replacing
-`sub/AGENTS.md`, which would make `SUB_MARKER` look "gone" for the wrong
-reason here):
+## Step 4 — A large root file can silently drop a smaller, deeper file
+
+`AGENTS.md` instructions share **one** 32 KiB budget, spent from the
+repository root down. If a file near the root is large enough on its own,
+Codex can run out of budget before it ever reaches a smaller, more specific
+file lower in the tree — and nothing reports that it happened.
+
+### Windows (PowerShell)
+
+```powershell
+$budgetRoot = Join-Path $env:TEMP "agents-md-budget-demo"
+New-Item -ItemType Directory -Force (Join-Path $budgetRoot "deep") | Out-Null
+Set-Location $budgetRoot
+git init -q
+# The root AGENTS.md alone is bigger than the 32 KiB budget.
+$filler = "x" * 40000
+Set-Content .\AGENTS.md "PADDING: $filler"
+Set-Content .\deep\AGENTS.md "DEEP_MARKER: the most specific instruction in this repo"
+git add -A
+git -c user.email=demo@example.com -c user.name=demo commit -q -m init
+Set-Location .\deep
+codex debug prompt-input > (Join-Path $env:TEMP "budget-prompt.json")
+Select-String -Path (Join-Path $env:TEMP "budget-prompt.json") -Pattern "DEEP_MARKER"
+```
+
+Expected: no match is printed. `deep\AGENTS.md` exists, sits on the
+collection path, and was never touched after being written — it simply
+never made it into the assembled instructions, because the oversized root
+file used up the whole budget first.
+
+Now shrink only the root file and rerun the same check:
+
+```powershell
+Set-Content (Join-Path $budgetRoot "AGENTS.md") "PADDING: small root file now"
+codex debug prompt-input > (Join-Path $env:TEMP "budget-prompt.json")
+Select-String -Path (Join-Path $env:TEMP "budget-prompt.json") -Pattern "DEEP_MARKER"
+```
+
+Expected: `DEEP_MARKER` now appears. Nothing about `deep\AGENTS.md` changed
+— only the size of the file above it in the path did.
+
+### Linux/macOS (Bash)
+
 ```bash
-rm /tmp/agents-md-demo/sub/AGENTS.override.md
-cd /tmp/agents-md-demo
-git add -A && git -c user.email=a@b.c -c user.name=demo commit -q -m "remove override, back to plain AGENTS.md"
-{ echo "ROOT_MARKER: this is the root AGENTS.md"; head -c 40000 /dev/zero | tr '\0' 'x'; echo; } > AGENTS.md
-wc -c AGENTS.md          # ~40 KB — comfortably over the ~32 KiB budget
-git add -A && git -c user.email=a@b.c -c user.name=demo commit -q -m "oversized root"
-cd sub
-codex debug prompt-input > /tmp/pi.json
-grep -c "ROOT_MARKER" /tmp/pi.json
-grep -c "SUB_MARKER" /tmp/pi.json
+budgetRoot="${TMPDIR:-/tmp}/agents-md-budget-demo"
+mkdir -p "$budgetRoot/deep"
+cd "$budgetRoot"
+git init -q
+# The root AGENTS.md alone is bigger than the 32 KiB budget.
+filler=$(python3 -c "print('x' * 40000)")
+printf 'PADDING: %s\n' "$filler" > AGENTS.md
+printf '%s\n' 'DEEP_MARKER: the most specific instruction in this repo' > deep/AGENTS.md
+git add -A
+git -c user.email=demo@example.com -c user.name=demo commit -q -m init
+cd deep
+codex debug prompt-input > "${TMPDIR:-/tmp}/budget-prompt.json"
+grep -o "DEEP_MARKER.*" "${TMPDIR:-/tmp}/budget-prompt.json" || echo "(not present)"
 ```
 
-**Expected:** `ROOT_MARKER` still found (**1**) — it's near the *top* of
-the now-40 KB root file. `SUB_MARKER` — the file physically closest to
-where you're working, and the one most likely to hold your most specific,
-most recently-written rule — is **gone** (**0**). No error anywhere in
-that output. No warning in the transcript. `sub/AGENTS.md` still exists on
-disk, completely untouched; it simply never made it into this call.
+Expected: `(not present)`. Now shrink only the root file and rerun:
 
-**Why:** the budget (~32 KiB, per the deck) is spent from the repo root
-**down** — a large file at the root can exhaust it before Codex ever
-reaches a file closer to your actual work. The file that goes missing is
-the one you're most likely to have written most recently, for the area
-you're currently touching — and there is no signal anywhere that it
-happened. The only way to catch this is to print the assembled block
-yourself, exactly like Step 2/3 just did.
+```bash
+printf 'PADDING: small root file now\n' > "$budgetRoot/AGENTS.md"
+codex debug prompt-input > "${TMPDIR:-/tmp}/budget-prompt.json"
+grep -o "DEEP_MARKER.*" "${TMPDIR:-/tmp}/budget-prompt.json"
+```
 
-**Cleanup:** `rm -rf /tmp/agents-md-demo` when done. (On native Windows
-without WSL2, use an equivalent temp path and `Remove-Item -Recurse
--Force`; `head -c N /dev/zero` won't exist under plain PowerShell — swap
-in `fsutil file createnew` or a short `for` loop to pad the file instead.)
+Expected: `DEEP_MARKER` now appears.
 
-## Step 5 — AGENTS.md is advice, not a boundary
+Purpose: this is the failure mode the deck calls out — the budget is spent
+top-down, a big file at the root can use it all up before Codex reaches the
+file next to your code, and there is no error, no prompt, nothing in the
+transcript. Keep `AGENTS.md` small on purpose: not to save money, but to
+stay correct.
 
-**Do this:** back in `english-translater-agent`, re-read the line already
-in this repo's `AGENTS.md`:
-> "Treat it as sensitive: never cat/print it, never put its contents in a
-> commit, PR description, or chat."
+## Step 5 — Instructions are not a security boundary
 
-Now recall Demo 2's (`03-demo-sandbox-approval.md`) Step 2: `cat .env`
-**succeeds** under every `sandbox_mode`, including `read-only` — the
-sandbox never blocks reads, in any mode.
+Return to the real repository and remember: `sandbox_mode = "read-only"`
+still allows a command to read a file. `AGENTS.md` can tell the model not to
+print `.env`, but it cannot technically prevent that action.
 
-**Expected (discussion, not a command):** the *only* thing standing
-between the model and printing `.env`'s contents right now is that one
-sentence in `AGENTS.md` — text the model is very likely to follow, but
-text competing for attention with everything else in the fixed block
-(Demo 1's, `02-demo-harness.md`, Step 3), not an enforced rule. Nothing
-about `sandbox_mode` or `approval_policy` makes that instruction real.
+Expected conclusion: use `AGENTS.md` for behavior and workflow guidance.
+Use sandbox rules, exec-policy rules, or hooks when an operation must be
+blocked. Demo 8 shows the hook-based secret check.
 
-**Why:** the deck's test to apply to any rule you're about to write in
-AGENTS.md: "would I be upset if the model ignored this once?" If yes, it
-doesn't belong in AGENTS.md alone — it belongs in an exec-policy rule or a
-`PreToolUse` hook (Demo 8, `09-demo-exec-policy-hooks.md`, builds exactly
-that: `.codex/hooks/block_secrets.py` in this repo denies any
-command that references a real `.env` file, regardless of what
-`AGENTS.md` says). Write instructions to make the model *useful*. Write
-config to make a boundary *real*.
+## Cleanup
+
+Run this from outside `$demoRoot` and `$budgetRoot`.
+
+Windows:
+
+```powershell
+Set-Location <path-to-english_translater>
+Remove-Item -Recurse -Force $demoRoot
+Remove-Item -Recurse -Force $budgetRoot
+Remove-Item (Join-Path $env:TEMP "agents-prompt.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $env:TEMP "codex-prompt.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $env:TEMP "budget-prompt.json") -ErrorAction SilentlyContinue
+```
+
+Linux/macOS:
+
+```bash
+cd <path-to-english_translater>
+rm -rf "$demoRoot" "$budgetRoot"
+rm -f "${TMPDIR:-/tmp}/agents-prompt.json" "${TMPDIR:-/tmp}/codex-prompt.json" "${TMPDIR:-/tmp}/budget-prompt.json"
+```

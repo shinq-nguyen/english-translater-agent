@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -7,6 +8,7 @@ from pathlib import Path
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 INSTALL_SH = PLUGIN_ROOT / "install.sh"
+INSTALL_PS1 = PLUGIN_ROOT / "install.ps1"
 
 # On Windows, resolve "bash" via a plain PATH scan (shutil.which) rather than
 # passing the bare string to subprocess. Windows' native CreateProcess search
@@ -26,6 +28,21 @@ def _init_target_repo(tmp_path):
 
 
 def _run_install(target):
+    if os.name == "nt":
+        powershell = shutil.which("powershell") or "powershell"
+        return subprocess.run(
+            [
+                powershell,
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(INSTALL_PS1),
+            ],
+            cwd=str(target),
+            capture_output=True,
+            text=True,
+        )
     return subprocess.run(
         [BASH_EXE, str(INSTALL_SH)],
         cwd=str(target),
@@ -87,8 +104,14 @@ def test_install_merges_hooks_json_into_existing(tmp_path):
     pre_commands = [
         h["command"] for entry in merged["hooks"]["PreToolUse"] for h in entry["hooks"]
     ]
+    pre_windows_commands = [
+        h.get("command_windows")
+        for entry in merged["hooks"]["PreToolUse"]
+        for h in entry["hooks"]
+    ]
     assert "python3 x.py" in pre_commands
-    assert "python .codex/hooks/guard_ticket_commit.py" in pre_commands
+    assert "python3 .codex/hooks/guard_ticket_commit.py" in pre_commands
+    assert "python .codex/hooks/guard_ticket_commit.py" in pre_windows_commands
     assert "PostToolUse" in merged["hooks"]
 
 
@@ -118,7 +141,7 @@ def test_install_is_idempotent(tmp_path):
     pre_commands = [
         h["command"] for entry in hooks["hooks"]["PreToolUse"] for h in entry["hooks"]
     ]
-    assert pre_commands.count("python .codex/hooks/guard_ticket_commit.py") == 1
+    assert pre_commands.count("python3 .codex/hooks/guard_ticket_commit.py") == 1
 
     skill_dir = target / ".agents" / "skills" / "implement-ticket"
     assert (skill_dir / "SKILL.md").exists()
@@ -135,7 +158,7 @@ def test_installed_hooks_resolve_workflow_root_with_no_argv(tmp_path):
     # which is only true post-install. Exercise that exact path here: run
     # install.sh into a fresh target repo, then invoke the INSTALLED hook
     # scripts with NO argv (matching the literal hooks.json command lines
-    # "python .codex/hooks/guard_ticket_commit.py" / "...ticket_audit.py"),
+    # "python3 .codex/hooks/guard_ticket_commit.py" / "...ticket_audit.py"),
     # cwd set to the target repo root, and confirm workflow_root resolves to
     # the target repo root rather than crashing or resolving somewhere else.
     target = _init_target_repo(tmp_path)

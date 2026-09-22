@@ -1,268 +1,296 @@
-# Demo 3 — Configuration
+# Demo 3 — Configuration precedence: identify the winner
 
-Covers deck slides 14–16. Prerequisite: `01-overview.md` done, this repo
-trusted in Codex.
+Covers slides 14–16. Run this demo from a trusted checkout. The commands
+below use `approval_policy` as the test key because `codex doctor` prints its
+effective value clearly.
 
-What you're demonstrating: six places can hold the same setting, and only
-one of them wins per key. Highest to lowest:
+## Purpose
 
-| # | Layer | Where | Wins over |
-|---|---|---|---|
-| 1 | `requirements.toml` | `/etc/codex/` (org policy) | everything, even `-c` |
-| 2 | `-c`/`--config` flags | the command line | everything below |
-| 3 | `config.toml` | `<repo>/.codex/` — **only if the repo is trusted** | your personal config, defaults |
-| 4 | `<name>.config.toml` | `~/.codex/` — activated with `--profile` | your personal config, defaults |
-| 5 | `config.toml` | `~/.codex/` (your normal settings) | machine-wide config, defaults |
-| 6 | `config.toml` | `/etc/codex/` (machine-wide — **low** priority) | only the built-in defaults |
-| — | built-in defaults | shipped with Codex | nothing |
+Show the six configurable layers and make the winning value visible. Each
+layer gets a different value; after each command, compare the `approval
+policy` line in `codex doctor` with the table below.
 
-This file gives every rung its own "who actually wins" moment, in order.
-Rungs 3 and 2 are already fully hands-on. Rung 4 (profile) gets a real,
-live test. Rungs 1 and 6 are explained rather than hand-built — see why
-under each.
+For this demo, show the six configuration surfaces in effective order. The
+requirements layer is listed first because it can reject a value resolved
+from any lower layer; it is not an ordinary personal override.
 
-## Step 1 — Prove the project config is the one actually in effect
+| Layer | Source | What it proves |
+|---|---|---|
+| 1 | `requirements.toml` | An organization can reject unsafe values; this is a constraint, not a normal personal override. |
+| 2 | CLI `-c` / `--config` | A one-run override beats local config. |
+| 3 | Trusted project `.codex/config.toml` | The repository config beats profile and user config. |
+| 4 | `--profile <name>` | A profile beats the normal user config. |
+| 5 | User `$CODEX_HOME/config.toml` | The user's baseline beats the machine fallback. |
+| 6 | System/managed config | A fallback supplied by an administrator or the operating system. |
 
-Your personal `~/.codex/config.toml` almost certainly has no
-`sandbox_mode`, `approval_policy`, or `mcp_servers` in it at all — check:
+Built-in defaults are the fallback when none of the six sources supplies a
+value. `requirements.toml` is special: when it forbids a value, lower layers
+cannot force that value with `-c`.
 
-**Do this:**
-```bash
-# Windows: type "$USERPROFILE\.codex\config.toml"
-cat ~/.codex/config.toml
-```
+## Step 1 — Prepare an isolated, disposable test
 
-**Expected:** no `sandbox_mode`, `approval_policy`, or `[mcp_servers.*]`
-keys anywhere in it (it typically only has things like `model`,
-`approvals_reviewer`, `[tui]`, and a `[projects.'<path>']` trust table).
+`CODEX_HOME` contains more than config: it can also contain `auth.json`,
+history, logs, and caches. A completely empty temporary home can therefore
+make an interactive `codex` command ask for login again. The commands below
+copy only an existing `auth.json` into the disposable home when it exists;
+they never print it. If credentials are stored in the OS keychain, no copy is
+needed.
 
-**Do this next:**
-```bash
-codex doctor
-```
-Look at the **Configuration** section.
+Run the **dry-run** (`codex doctor`) before the live trust prompt. If it opens
+a login flow, press `Ctrl+C`, restore the original `CODEX_HOME`, and do not
+continue with the demo until the machine-specific auth setup is fixed.
 
-**Expected:**
-```
-✓ config       loaded
-    ...
-    MCP servers              2
-✓ mcp          2 server (2 stdio) · 1 disabled
-✓ sandbox      restricted fs + enabled network · approval OnRequest
-    approval policy          OnRequest
-```
+Start from the repository root.
 
-**Why:** none of `MCP servers: 2`, `network sandbox: enabled`, or
-`approval policy: OnRequest` come from your global config — Step 1 just
-showed it doesn't define any of them. They can only be coming from
-`<repo>/.codex/config.toml` (rung 3), which does (`sandbox_mode =
-"workspace-write"`, `approval_policy = "on-request"`,
-`[mcp_servers.translator_db]`, `[mcp_servers.demo_file_writer]`). This is
-the precedence ladder's rung 3, made concrete: the repo's config is what
-actually won, silently, over whatever your personal defaults (rung 5)
-would otherwise have been.
+### Windows (PowerShell)
 
-## Step 2 — A `-c` flag beats the repo's config
-
-**Do this:**
-```bash
-codex doctor -c approval_policy='"never"'
-```
-
-**Expected:**
-```
-approval policy          Never
-```
-— flipped from `OnRequest` (Step 1) to `Never`, for this one invocation
-only; `.codex/config.toml` on disk is untouched.
-
-**Why:** `-c`/`--config` (rung 2) sits one rung **above**
-`<repo>/.codex/config.toml` (rung 3) — it wins regardless of what the repo
-or your personal config say, which is exactly why it's the tool Demos 1
-and 2 (`02-demo-harness.md`, `03-demo-sandbox-approval.md`) use throughout
-to test one setting in isolation without editing any file.
-
-## Step 3 — The profile layer: real, but outranked by a trusted repo
-
-A **profile** is not a section inside `config.toml` — verified directly
-against this machine's real Codex install, `codex --help` says exactly
-this:
-```
--p, --profile <CONFIG_PROFILE_V2>
-        Layer $CODEX_HOME/<name>.config.toml on top of the base user config
-```
-A profile is its own **file**: `~/.codex/<name>.config.toml` (or
-`$CODEX_HOME/<name>.config.toml` if you've set that env var), activated
-per-invocation with `-p`/`--profile <name>`. It sits at rung 4 — above
-your personal `config.toml` (rung 5), but **below** a trusted repo's own
-`.codex/config.toml` (rung 3). That last part is the counter-intuitive bit
-this step proves: an explicit `--profile` flag on the command line does
-**not** act like a `-c` override. It loses to this repo's own settings.
-
-**Do this:** create a profile that tries to tighten the sandbox:
-```bash
-# Windows: notepad "$USERPROFILE\.codex\demo-profile.config.toml"
-cat > ~/.codex/demo-profile.config.toml <<'EOF'
-sandbox_mode = "read-only"
-EOF
-```
-Now, **in this repo** (`english-translater-agent`, which has its own
-`sandbox_mode = "workspace-write"` in `.codex/config.toml`):
-```bash
-codex --profile demo-profile debug prompt-input | grep -o 'sandbox_mode. is .[a-z-]*'
-```
-
-**Expected:** `sandbox_mode` is `workspace-write` — **unchanged**. The
-profile's `read-only` never took effect here.
-
-**Do this next:** prove the profile isn't simply broken — run the exact
-same profile somewhere this repo's config can't reach. Pick (or make) a
-folder that's **trusted** but has no `.codex/config.toml` of its own —
-e.g. any other project you've already opened Codex in and accepted the
-trust prompt for, or a fresh folder you trust now for this test:
-```bash
-mkdir -p /tmp/codex-profile-demo && cd /tmp/codex-profile-demo
-codex   # accept the trust prompt this time — "1. Trust and continue"
-# exit codex (Ctrl+D), then:
-codex --profile demo-profile debug prompt-input | grep -o 'sandbox_mode. is .[a-z-]*'
-```
-
-**Expected:** `sandbox_mode` is `read-only` — the profile **did** take
-effect, flipping this trusted-but-configless folder away from its own
-default (`workspace-write`, per Demo 2's "which one you get by default").
-
-**Why:** both runs used the identical `~/.codex/demo-profile.config.toml`.
-The only variable was whether the folder had its own `.codex/config.toml`
-(rung 3). When it did, rung 3 won. When it didn't, rung 4 (the profile)
-was free to act — confirming profiles are real and functional, just
-outranked by the one thing this whole repo's demo kit revolves around: a
-trusted repo's own configuration.
-
-**Cleanup:**
-```bash
-rm ~/.codex/demo-profile.config.toml
-rm -rf /tmp/codex-profile-demo
-```
-(Windows without WSL2: delete `%USERPROFILE%\.codex\demo-profile.config.toml`
-and the equivalent temp folder with `Remove-Item -Recurse -Force`.) Also
-remove the `/tmp/codex-profile-demo` entry from your own
-`~/.codex/config.toml`'s `[projects.*]` trust table if you don't want to
-keep that scratch folder trusted going forward.
-
-## Rung 1 — `requirements.toml`: the org-policy layer (explained, not built)
-
-**What it is:** `/etc/codex/requirements.toml` — a file an organization's
-admin controls, not an individual session. It's the only rung that beats
-even a `-c` flag, by design: it exists so an org can enforce a guardrail
-(e.g. "never allow `danger-full-access`") that no developer, script, or CI
-job invocation can talk their way around with a flag.
-
-**Why this file isn't hand-built here:** it's admin/root-owned by
-convention — writing to `/etc/codex/` needs root on Linux/macOS, and
-Windows has no `/etc` at all (this deck's examples are written
-Unix-path-first; there's no confirmed Windows equivalent path surfaced by
-`codex --help` or `codex doctor` on this machine). Asking workshop
-attendees to fabricate an org-policy file on their own laptop would also
-misrepresent what this layer is for — it's fleet-managed, not
-personal-machine config.
-
-**Do this (the one live, checkable trace that this layer is real):**
-```bash
-codex doctor | grep "configuration scope"
-```
-
-**Expected:**
-```
-configuration scope      invocation config, including cloud-managed policy
-```
-
-**Why:** `codex doctor` explicitly checks for and reports on a
-cloud-/org-managed policy layer as part of the *same* resolution pipeline
-that produced everything in Steps 1–3 — it's just empty on a personal dev
-machine (`managed filesystem source: none`, if you look a few lines below
-this one). If your organization ever rolls one out, it slots in above
-even the `-c` flags this whole demo kit relies on for isolated testing.
-
-## Rung 6 — the machine-wide `/etc/codex/config.toml`: low priority despite the path
-
-**The one genuinely counter-intuitive row in the whole ladder:**
-`/etc/codex/config.toml` — a machine-wide default, in the same
-system-sounding location as rung 1's `requirements.toml` — ranks **below**
-your own personal `~/.codex/config.toml` (rung 5), not above it. A
-system administrator's machine-wide baseline is meant to be a *fallback*
-you can freely override for yourself, not a policy (that's what
-`requirements.toml`, rung 1, is for). Same reasoning as rung 1 for why
-this isn't hand-built in the demo: no confirmed Windows path, and root
-access is needed even on Linux/macOS to test it for real. Worth stating
-out loud in a live session, since "machine-wide" reads as "should win,"
-and here it's the second-weakest rung on the entire ladder — only the
-built-in defaults rank lower.
-
-## Step 4 — Untrusted means not loaded at all, not "loaded but weaker"
-
-**Do this:** pick (or create) a folder Codex has never opened before —
-e.g. a fresh `mkdir /tmp/codex-untrusted-demo && cd` into it, or ask
-someone in the room for a folder they haven't opened Codex in yet. Copy
-this repo's `.codex/config.toml` into it:
-```bash
-mkdir -p /tmp/codex-untrusted-demo/.codex
-cp .codex/config.toml /tmp/codex-untrusted-demo/.codex/
-cd /tmp/codex-untrusted-demo
+```powershell
+$repoRoot = (Get-Location).Path
+$originalCodexHome = $env:CODEX_HOME
+$originalCodexHomePath = if ([string]::IsNullOrWhiteSpace($originalCodexHome)) { Join-Path $env:USERPROFILE ".codex" } else { $originalCodexHome }
+$layerRoot = Join-Path $env:TEMP "codex-config-layers-$PID"
+$demoHome = Join-Path $layerRoot "codex-home"
+$demoWork = Join-Path $layerRoot "trusted-workspace"
+New-Item -ItemType Directory -Force $demoHome, $demoWork | Out-Null
+if (Test-Path (Join-Path $originalCodexHomePath "auth.json")) {
+    Copy-Item (Join-Path $originalCodexHomePath "auth.json") (Join-Path $demoHome "auth.json")
+}
+$env:CODEX_HOME = $demoHome
+Set-Location $demoWork
+codex doctor --no-color
 codex
 ```
 
-**Expected:** Codex shows the trust prompt (`Trust this folder?`). Choose
-**"2. Quit"** or otherwise decline. Then:
+Expected for the dry-run: `codex doctor` completes without starting a login
+flow. Then, at the trust prompt, choose **Trust and continue**, and exit
+Codex. This scratch folder deliberately has no project config yet.
+
+### Linux/macOS (Bash)
+
 ```bash
-codex doctor
+repoRoot="$PWD"
+hadCodexHome="${CODEX_HOME+x}"
+originalCodexHome="${CODEX_HOME:-$HOME/.codex}"
+layerRoot="${TMPDIR:-/tmp}/codex-config-layers-$$"
+demoHome="$layerRoot/codex-home"
+demoWork="$layerRoot/trusted-workspace"
+mkdir -p "$demoHome" "$demoWork"
+if test -f "$originalCodexHome/auth.json"; then
+  cp "$originalCodexHome/auth.json" "$demoHome/auth.json"
+fi
+export CODEX_HOME="$demoHome"
+cd "$demoWork"
+codex doctor --no-color
+codex
 ```
 
-**Expected:** `MCP servers: 0` (or whatever your personal global config
-has, not 2), `approval policy` back to whatever your personal default is
-— the exact same `config.toml` content as this repo's, sitting right
-there on disk, produces **none** of the same effective settings, because
-the folder was never trusted.
+Expected for the dry-run: `codex doctor` completes without starting a login
+flow. Then, at the trust prompt, choose **Trust and continue**, and exit
+Codex.
 
-**Why:** this is the deck's sharpest point on configuration — a repo's
-`.codex/config.toml` isn't "loaded but sandboxed" when untrusted, it's not
-loaded **at all**. `git clone` alone was never enough to make a cloned
-repo's settings (or hooks) take effect; only accepting the trust prompt
-does. `01-overview.md`'s "one thing worth re-checking" section calls out
-the same thing for the same reason: it's the single most common cause of
-"the repo's config doesn't seem to be working."
+## Step 2 — Show the current winner, before adding local values
 
-**Cleanup:** `rm -rf /tmp/codex-untrusted-demo` when done (adjust path on
-Windows: `Remove-Item -Recurse -Force` on the equivalent temp folder).
+Run from `demoWork`:
 
-## Step 5 — Check the winner live, never by reading a file
+### Windows (PowerShell)
 
-**Do this:** back in this repo, inside a `codex` session:
-```
-/status
-```
-```
-/debug-config
+```powershell
+codex doctor --no-color | Select-String "approval policy|configuration"
 ```
 
-**Expected:** `/status` shows the sandbox/approval settings actually in
-effect right now for this session. `/debug-config` goes further — it
-shows **which config layer** won for a given key and why (e.g. "from
-project config.toml" vs. "from CLI override" vs. "built-in default").
+### Linux/macOS (Bash)
 
-**Why:** the habit the deck asks you to build, restated from Demo 2
-(`03-demo-sandbox-approval.md`): never conclude a setting is active
-because a file on disk says so. Six configuration layers can define the
-same key; only `/status`/`/debug-config`, run in the actual session
-you're in, tell you which one actually won.
+```bash
+codex doctor --no-color | grep -Ei "approval policy|configuration"
+```
 
-## Summary — every rung, and how this file covers it
+Expected: the value comes from the system/managed layer if one exists;
+otherwise it is the built-in default. This is the Layer 6 baseline. Do not
+assume that a machine-wide file exists on a developer laptop.
 
-| Rung | Layer | This file | Where |
-|---|---|---|---|
-| 1 | `requirements.toml` (org) | Explained + one live check (`codex doctor`) | "Rung 1" section |
-| 2 | `-c` flags | **Live** — beats rung 3 | Step 2 |
-| 3 | `<repo>/.codex/config.toml` | **Live** — beats rung 5, needs trust | Steps 1, 4 |
-| 4 | `<profile>.config.toml` (`--profile`) | **Live** — beats rung 5, loses to rung 3 | Step 3 |
-| 5 | `~/.codex/config.toml` (personal) | **Live** — the baseline every other step compares against | Step 1 |
-| 6 | `/etc/codex/config.toml` (machine-wide) | Explained only | "Rung 6" section |
-| — | built-in defaults | Implicit — what's left once nothing else applies | throughout |
+## Step 3 — Layer 5: user config wins over the baseline
+
+Create a user config in the disposable `CODEX_HOME`:
+
+### Windows (PowerShell)
+
+```powershell
+Set-Content (Join-Path $demoHome "config.toml") 'approval_policy = "on-failure"'
+codex doctor --no-color | Select-String "approval policy"
+```
+
+### Linux/macOS (Bash)
+
+```bash
+printf 'approval_policy = "on-failure"\n' > "$demoHome/config.toml"
+codex doctor --no-color | grep -Ei "approval policy"
+```
+
+Expected: `approval policy` is `OnFailure`. Layer 5 now beats the Layer 6
+baseline.
+
+## Step 4 — Layer 4: profile wins over user config
+
+Add a profile with a different value, then select it explicitly:
+
+### Windows (PowerShell)
+
+```powershell
+Set-Content (Join-Path $demoHome "layer-demo.config.toml") 'approval_policy = "never"'
+codex --profile layer-demo doctor --no-color | Select-String "approval policy"
+```
+
+### Linux/macOS (Bash)
+
+```bash
+printf 'approval_policy = "never"\n' > "$demoHome/layer-demo.config.toml"
+codex --profile layer-demo doctor --no-color | grep -Ei "approval policy"
+```
+
+Expected: `approval policy` is `Never`. The profile (Layer 4) beats the user
+config (Layer 5). Without `--profile layer-demo`, it returns to `OnFailure`.
+
+## Step 5 — Layer 3: trusted project config beats the profile
+
+Create a project config in the already trusted scratch folder:
+
+### Windows (PowerShell)
+
+```powershell
+New-Item -ItemType Directory -Force (Join-Path $demoWork ".codex") | Out-Null
+Set-Content (Join-Path $demoWork ".codex\config.toml") 'approval_policy = "on-request"'
+codex --profile layer-demo doctor --no-color | Select-String "approval policy"
+```
+
+### Linux/macOS (Bash)
+
+```bash
+mkdir -p "$demoWork/.codex"
+printf 'approval_policy = "on-request"\n' > "$demoWork/.codex/config.toml"
+codex --profile layer-demo doctor --no-color | grep -Ei "approval policy"
+```
+
+Expected: `approval policy` is `OnRequest`. The trusted project config
+(Layer 3) beats the selected profile and the user config. This is the same
+precedence that makes this repository's `.codex/config.toml` effective.
+
+## Step 6 — Layer 2: CLI override wins for one invocation
+
+Run the same command with a CLI override:
+
+### Windows and Linux/macOS
+
+```text
+codex doctor -c approval_policy='"never"'
+```
+
+Expected: `approval policy` is `Never` for this invocation. Run the command
+again without `-c`; it returns to `OnRequest`. No file changed.
+
+## Step 7 — Layer 1: requirements.toml is the unbreakable guardrail
+
+`requirements.toml` is controlled by an organization administrator. Do not
+create or edit it on a personal machine just to make this demo work.
+
+The [current official OpenAI managed-configuration documentation](https://learn.chatgpt.com/docs/enterprise/managed-configuration)
+lists these system requirements locations:
+
+- Windows: `%ProgramData%\OpenAI\Codex\requirements.toml`
+- Linux/macOS: `/etc/codex/requirements.toml`
+
+This is an administrator-managed file, not a file to create during a local
+demo. If the installed Codex version reports a different managed source,
+follow `codex doctor` and that version's official documentation.
+
+### Windows (PowerShell)
+
+```powershell
+$requirementsPath = Join-Path $env:ProgramData "OpenAI\Codex\requirements.toml"
+if (Test-Path $requirementsPath) { "Managed requirements found" } else { "No managed requirements on this machine" }
+codex doctor -c approval_policy='"never"'
+```
+
+### Linux/macOS (Bash)
+
+```bash
+if test -f /etc/codex/requirements.toml; then echo "Managed requirements found"; else echo "No managed requirements on this machine"; fi
+codex doctor -c approval_policy='"never"'
+```
+
+Expected on an unmanaged laptop: the CLI value is still `Never`, because no
+Layer 1 policy is installed. On a managed machine whose requirements forbid
+`approval_policy = "never"`, Codex rejects or replaces that value and reports
+the managed restriction. That is the Layer 1 win: a lower layer cannot
+override the requirement.
+
+## Step 8 — Trust is the gate for Layer 3
+
+This is a separate check: a project config in an untrusted folder is not a
+lower-priority value; it is ignored completely.
+
+### Windows (PowerShell)
+
+```powershell
+$untrusted = Join-Path $layerRoot "untrusted-workspace"
+New-Item -ItemType Directory -Force (Join-Path $untrusted ".codex") | Out-Null
+Copy-Item (Join-Path $demoWork ".codex\config.toml") (Join-Path $untrusted ".codex\config.toml")
+Set-Location $untrusted
+codex
+```
+
+Decline trust, exit Codex, then run:
+
+```powershell
+codex doctor --no-color | Select-String "approval policy"
+```
+
+### Linux/macOS (Bash)
+
+```bash
+untrusted="$layerRoot/untrusted-workspace"
+mkdir -p "$untrusted/.codex"
+cp "$demoWork/.codex/config.toml" "$untrusted/.codex/config.toml"
+cd "$untrusted"
+codex
+```
+
+Decline trust, exit Codex, then run:
+
+```bash
+codex doctor --no-color | grep -Ei "approval policy"
+```
+
+Expected: `approval policy` is `OnFailure`, not the copied `OnRequest`. The
+untrusted folder's `.codex/config.toml` (Layer 3) is not loaded at all, so
+the effective value falls all the way back to Layer 5 — the same
+`$demoHome/config.toml` set in Step 3 — not to Layer 6 or the built-in
+default, since that user-level file is still present and still applies
+without needing trust.
+
+## Cleanup
+
+Return to the repository, remove the disposable folder, and clear the
+temporary environment variable.
+
+### Windows (PowerShell)
+
+```powershell
+Set-Location $repoRoot
+Remove-Item -Recurse -Force $layerRoot
+if ([string]::IsNullOrWhiteSpace($originalCodexHome)) {
+    Remove-Item Env:CODEX_HOME -ErrorAction SilentlyContinue
+} else {
+    $env:CODEX_HOME = $originalCodexHome
+}
+```
+
+### Linux/macOS (Bash)
+
+```bash
+cd "$repoRoot"
+rm -rf "$layerRoot"
+if test -n "${hadCodexHome:-}"; then export CODEX_HOME="$originalCodexHome"; else unset CODEX_HOME; fi
+```
+
+Final check: the repository's `.codex/config.toml` and the real user
+`config.toml` were not edited by this demo.

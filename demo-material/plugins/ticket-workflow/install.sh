@@ -9,6 +9,11 @@ set -euo pipefail
 
 PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_ROOT="$(pwd)"
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN="python3"
+else
+  PYTHON_BIN="python"
+fi
 
 echo "Installing ticket-workflow plugin into: $TARGET_ROOT"
 
@@ -23,11 +28,11 @@ mkdir -p "$TARGET_ROOT/.codex/hooks"
 cp "$PLUGIN_ROOT"/hooks/*.py "$TARGET_ROOT/.codex/hooks/"
 chmod +x "$TARGET_ROOT"/.codex/hooks/*.py
 
-python "$PLUGIN_ROOT/hooks/merge_config.py" \
+"$PYTHON_BIN" "$PLUGIN_ROOT/hooks/merge_config.py" \
   "$TARGET_ROOT/.codex/config.toml" \
   "$PLUGIN_ROOT/config-snippet.toml"
 
-python - "$TARGET_ROOT/.codex/hooks.json" "$PLUGIN_ROOT/hooks-snippet.json" <<'PYEOF'
+"$PYTHON_BIN" - "$TARGET_ROOT/.codex/hooks.json" "$PLUGIN_ROOT/hooks-snippet.json" <<'PYEOF
 # Both files nest their event lists under a top-level "hooks" key -- this
 # matches the real shape of Codex's hooks.json (verified against this
 # repo's own .codex/hooks.json), not a flat {"PreToolUse": [...]} object.
