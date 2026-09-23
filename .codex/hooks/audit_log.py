@@ -130,12 +130,19 @@ def _redact(value, key=None):
     if key is not None and SENSITIVE_KEY_PATTERN.search(str(key)):
         return "<redacted:secret>"
     if isinstance(value, str):
+        original_length = len(value)
+        if original_length > MAX_VALUE_LEN:
+            # Bound the expensive redaction scans before running them. Hook
+            # payloads can contain a complete tool response, and scanning a
+            # multi-megabyte response synchronously can exceed Codex's hook
+            # timeout on Windows.
+            value = value[:MAX_VALUE_LEN]
         value = KEY_VALUE_SECRET_PATTERN.sub(r"\1<redacted:secret>", value)
         value = BEARER_PATTERN.sub(r"\1<redacted:bearer-token>", value)
         value = API_KEY_PATTERN.sub("<redacted:api-key>", value)
         value = JWT_PATTERN.sub("<redacted:jwt>", value)
-        if len(value) > MAX_VALUE_LEN:
-            value = value[:MAX_VALUE_LEN] + f"...<truncated, {len(value)} chars total>"
+        if original_length > MAX_VALUE_LEN:
+            value = value[:MAX_VALUE_LEN] + f"...<truncated, {original_length} chars total>"
         return value
     if isinstance(value, list):
         return [_redact(item) for item in value]
