@@ -76,5 +76,5 @@ enabled = false
 # no [agents.secret_auditor] entry needed.
 # ---------------------------------------------------------------------------
 [agents]
-max_threads = 4
-max_depth = 1
+#max_threads = 4
+#max_depth = 1
