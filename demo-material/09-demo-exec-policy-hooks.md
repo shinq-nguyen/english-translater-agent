@@ -47,17 +47,40 @@ backstop.
 
 In a Codex session, ask:
 
-> Run `Get-Content .\.env`.
+> Run `Test-Path .\.env`.
 
 ### Linux/macOS (Bash)
 
 In a Codex session, ask:
 
-> Run `head -n5 .env`.
+> Run `test -f .env`.
 
 Expected: the command is denied by `block_secrets.py`. Do not approve or
 retry the command. The Hook sees the full command text and blocks the request
 without exposing the file contents.
+
+This interactive test depends on the model proposing a tool call. If the
+model refuses the request before calling a tool, no `PreToolUse` Hook runs;
+that demonstrates model-level safety, not the Hook itself. For a deterministic
+Hook-only test, send a synthetic `PreToolUse` payload directly to the Hook.
+The payload contains the command as text; the Hook does not execute it.
+
+Windows (PowerShell):
+
+```powershell
+'{"tool_name":"Bash","tool_input":{"command":"Test-Path ./.env"}}' |
+  python .codex/hooks/block_secrets.py
+```
+
+Linux/macOS (Bash):
+
+```bash
+printf '%s\n' '{"tool_name":"Bash","tool_input":{"command":"test -f .env"}}' \
+  | python3 .codex/hooks/block_secrets.py
+```
+
+Expected: JSON containing `"permissionDecision": "deny"`. This is the
+reliable way to test the Hook without risking the real `.env` contents.
 
 ## Step 3 — Inspect the audit Hook
 
