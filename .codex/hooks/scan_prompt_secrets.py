@@ -58,8 +58,10 @@ def _classify(prompt):
 
 def main() -> int:
     try:
-        event = json.load(sys.stdin)
-    except json.JSONDecodeError:
+        # utf-8-sig: Windows PowerShell can prepend a BOM when piping a
+        # manual test payload; Codex itself never sends one.
+        event = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
+    except ValueError:
         # Fail open on malformed input rather than blocking every prompt.
         return 0
     if not isinstance(event, dict):

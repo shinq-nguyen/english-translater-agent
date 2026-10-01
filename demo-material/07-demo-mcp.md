@@ -41,8 +41,10 @@ Ask Codex:
 > Using the `translator_db` MCP tool, run a read-only query that lists the
 > `name` and `description` columns from the `roles` table.
 
-Expected: the transcript shows a call to the MCP `query` tool and returns the
-five seeded roles. The important observation is that MCP appears in the same
+Expected: Codex asks for approval before the MCP call (MCP tool calls are
+approval-gated by default in current Codex builds) — approve it. The
+transcript then shows a call to the MCP `query` tool and returns the seeded
+roles (five on a fresh database). The important observation is that MCP appears in the same
 tool list as shell and file tools.
 
 ## Step 3 — Observe the server/context switch
@@ -122,8 +124,11 @@ Expected: both `translator_db` and `demo_file_writer` are connected;
 
 Expected:
 
-- The shell write is denied and `sandbox_write_test.txt` does not exist.
-- The MCP write succeeds. The file exists at
+- The shell write is denied ("Access to the path ... is denied") and
+  `sandbox_write_test.txt` does not exist. If Codex asks to retry outside
+  the sandbox, decline.
+- The MCP write succeeds once you approve the `write_file` tool call. The
+  file exists at
   `demo-material\mcp-servers\file-writer\writes\mcp_write_test.txt`.
 
 This demonstrates that the Codex shell sandbox does not automatically wrap

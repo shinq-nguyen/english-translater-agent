@@ -135,10 +135,11 @@ In a Codex session, ask:
 
 > Run `pytest` in the shell.
 
-Expected: the command fails with "pytest is not recognized"/"command not
-found" — this repo has no Python test suite, so that failure is expected
-and not the point. What matters is *which* command actually ran. Check the
-audit log:
+Expected: if `pytest` is installed it collects the kit's own Python tests
+(hook and plugin tests) and stops at the first failure; if it is not, the
+command fails with "pytest is not recognized"/"command not found". Either
+outcome is fine and not the point. What matters is *which* command actually
+ran. Check the audit log:
 
 Windows (PowerShell):
 
@@ -152,10 +153,12 @@ Linux/macOS (Bash):
 tail -n 20 .codex/logs/audit.log
 ```
 
-Expected: the `PreToolUse` line's `tool_input.command` reads
-`pytest --maxfail=1`, not the bare `pytest` the model proposed. Nothing in
-the chat transcript calls out that the command changed — a rewrite is
-invisible unless you go looking for it, which is why a hook that rewrites
+Expected: the `PreToolUse` records (`model_suggests_tool`) still show the
+bare `pytest` the model proposed, while the `PostToolUse` records
+(`tool_returns`) for the same `turn_id` show `tool_input.command` as
+`pytest --maxfail=1` — the command that actually ran. The transcript shows
+the executed command but never says a hook changed it — a rewrite is easy
+to miss unless you compare the two, which is why a hook that rewrites
 should also log what it replaced.
 
 ## Step 6 — Compare the layers

@@ -271,7 +271,7 @@ def _record(event):
 
 def main() -> int:
     try:
-        event = json.load(sys.stdin)
+        event = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
         if isinstance(event, dict):
             _record(event)
     except Exception:
