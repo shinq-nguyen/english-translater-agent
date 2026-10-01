@@ -71,8 +71,9 @@ cost. Keep servers disabled when a workflow does not need them.
 
 ## Step 4 — Compare the shell sandbox with an MCP process
 
-This step uses the small local `demo_file_writer` server. It writes only to
-`demo-material\mcp-servers\file-writer\writes`.
+This step uses the small local `demo_file_writer` server. Its one tool
+creates a new file in the repository root — the same folder the shell is
+about to be denied. It never overwrites an existing file.
 
 ### 4a. Prepare the server
 
@@ -106,11 +107,18 @@ Expected: both `translator_db` and `demo_file_writer` are connected;
 
 ### 4b. Compare two writes
 
-1. Temporarily set the root setting in `.codex/config.toml` to:
+1. Temporarily set the two root settings in `.codex/config.toml` to:
 
    ```toml
    sandbox_mode = "read-only"
+   approval_policy = "never"
    ```
+
+   `approval_policy = "never"` removes every approval prompt, so nothing can
+   be "approved through". `demo_file_writer` is already configured with
+   `default_tools_approval_mode = "approve"`, which is how a team typically
+   trusts an MCP server it uses every day. The only protection left in play
+   is the sandbox.
 
 2. Restart Codex.
 3. Ask Codex to run this normal shell command:
@@ -119,21 +127,23 @@ Expected: both `translator_db` and `demo_file_writer` are connected;
 
 4. Ask Codex:
 
-   > Using `demo_file_writer`, write `mcp_write_test.txt` with the content
-   > `test`.
+   > Using `demo_file_writer`, write `sandbox_write_test.txt` with the
+   > content `test`.
 
 Expected:
 
-- The shell write is denied ("Access to the path ... is denied") and
-  `sandbox_write_test.txt` does not exist. If Codex asks to retry outside
-  the sandbox, decline.
-- The MCP write succeeds once you approve the `write_file` tool call. The
-  file exists at
-  `demo-material\mcp-servers\file-writer\writes\mcp_write_test.txt`.
+- The shell write is denied ("Access to the path ... is denied") with no
+  prompt, and `sandbox_write_test.txt` does not exist.
+- The MCP write succeeds with no prompt. `sandbox_write_test.txt` now exists
+  in the repository root — the exact file, in the exact folder, that the
+  read-only sandbox just refused the shell.
 
-This demonstrates that the Codex shell sandbox does not automatically wrap
-the separately launched MCP server process. Treat every MCP server as a
-trusted local program with its own access.
+Same session, same target file, opposite results. This demonstrates that the
+Codex shell sandbox does not wrap the separately launched MCP server
+process: the server runs with your full user permissions and could have
+written anywhere you can. The approval prompt is the only Codex-side gate on
+an MCP tool, and it disappears as soon as the server is pre-approved. Treat
+every MCP server as a trusted local program with its own access.
 
 ## Cleanup
 
@@ -141,23 +151,22 @@ Restore the project config:
 
 ```toml
 sandbox_mode = "workspace-write"
+approval_policy = "on-request"
 
 [mcp_servers.demo_file_writer]
 enabled = false
 ```
 
-Restart Codex, then remove the test files if they exist.
+Restart Codex, then remove the test file if it exists.
 
 Windows (PowerShell):
 
 ```powershell
 Remove-Item .\sandbox_write_test.txt -ErrorAction SilentlyContinue
-Remove-Item .\demo-material\mcp-servers\file-writer\writes\mcp_write_test.txt -ErrorAction SilentlyContinue
 ```
 
 Linux/macOS (Bash):
 
 ```bash
 rm -f sandbox_write_test.txt
-rm -f demo-material/mcp-servers/file-writer/writes/mcp_write_test.txt
 ```

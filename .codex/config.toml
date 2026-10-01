@@ -16,8 +16,11 @@
 # custom agent role). That's why the two root settings are first in this
 # file, before any `[section]`.
 
-sandbox_mode = "workspace-write"
-approval_policy = "on-request"
+#sandbox_mode = "workspace-write"
+#approval_policy = "on-request"
+
+sandbox_mode = "read-only"
+approval_policy = "never"
 
 [sandbox_workspace_write]
 # Demo 8 (exec-policy-hooks) uses `false` to show a git-push escalation.
@@ -55,7 +58,11 @@ enabled = true
 # the Postgres level, so a write through it fails the same way regardless of
 # sandbox_mode. This one actually writes a file, so tightening sandbox_mode
 # to "read-only" and calling it is a real write-vs-write comparison against
-# the shell tool. Off by default — `enabled = false` here means the same
+# the shell tool. It creates the file in the repo root — the same folder the
+# sandbox refuses the shell — and `default_tools_approval_mode = "approve"`
+# pre-approves its tool, so with approval_policy = "never" the only thing
+# left that could stop the write is the sandbox (and it doesn't).
+# Off by default — `enabled = false` here means the same
 # thing Step 3b's toggle does: flip it to `true` right before Step 4b, back
 # to `false` after, so it isn't paying context rent on every other demo.
 # Requires `cd demo-material/mcp-servers/file-writer && npm install` once
@@ -66,7 +73,8 @@ command = "node"
 args = ["demo-material/mcp-servers/file-writer/index.js"]
 startup_timeout_sec = 15
 tool_timeout_sec = 30
-enabled = false
+default_tools_approval_mode = "approve"
+enabled = true
 
 # ---------------------------------------------------------------------------
 # Demo 7 — Subagents: cap how many can be open concurrently, so a runaway
